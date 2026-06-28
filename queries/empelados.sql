@@ -1,0 +1,22 @@
+INSERT INTO public."Empleados" (name, position, start_date, work_time, hours_per_day, work_schedule, cedula, telefono)
+VALUES
+('Juan Pérez', 'Desarrollador', '2021-01-15', '09:00', 8, 'Lunes a Viernes, 9am - 5pm', 'V20123456', '04141234567'),
+('Ana Gómez', 'Diseñadora', '2020-03-22', '10:00', 6, 'Lunes a Viernes, 10am - 4pm', 'V21456789', '04249876543'),
+('Carlos Sánchez', 'Gerente', '2018-11-05', '08:00', 9, 'Lunes a Viernes, 8am - 5pm', 'V15789012', '04125556677'),
+('María López', 'Analista', '2019-07-11', '09:30', 7, 'Lunes a Viernes, 9:30am - 4:30pm', 'V18901234', '04221112233'),
+('Pedro Rodríguez', 'Programador', '2021-09-14', '11:00', 6, 'Lunes a Viernes, 11am - 5pm', 'V25678901', '04169998877'),
+('Lucía Fernández', 'Administrativa', '2020-12-01', '08:30', 8, 'Lunes a Viernes, 8:30am - 4:30pm', 'V22345678', '04264445566'),
+('José Martínez', 'Contador', '2017-05-19', '09:00', 8, 'Lunes a Viernes, 9am - 5pm', 'V16456789', '04142223344'),
+('Laura Ramírez', 'Desarrolladora', '2018-06-07', '10:00', 7, 'Lunes a Viernes, 10am - 5pm', 'V19567890', '04247778899'),
+('Miguel Torres', 'Soporte Técnico', '2021-03-16', '09:00', 8, 'Lunes a Viernes, 9am - 5pm', 'V27890123', '04126667788'),
+('Sara Morales', 'Recursos Humanos', '2019-09-23', '08:00', 7, 'Lunes a Viernes, 8am - 3pm', 'V20901234', '04163334455'),
+('David Vega', 'Desarrollador', '2022-02-14', '09:30', 7, 'Lunes a Viernes, 9:30am - 4:30pm', 'V28123456', '04268889900'),
+('Elena Ortiz', 'Diseñadora', '2021-11-10', '10:30', 6, 'Lunes a Viernes, 10:30am - 4:30pm', 'V29345678', '04140001122'),
+('Jorge Herrera', 'Gerente', '2016-04-18', '08:00', 9, 'Lunes a Viernes, 8am - 5pm', 'V14567890', '04245551122'),
+('Isabel Domínguez', 'Analista', '2019-02-05', '09:00', 8, 'Lunes a Viernes, 9am - 5pm', 'V17678901', '04129990011'),
+('Ricardo Ruiz', 'Programador', '2020-10-22', '10:00', 7, 'Lunes a Viernes, 10am - 5pm', 'V24789012', '04224443322'),
+('Patricia Flores', 'Administrativa', '2018-08-30', '08:30', 8, 'Lunes a Viernes, 8:30am - 4:30pm', 'V18890123', '04167776655'),
+('Roberto Castillo', 'Contador', '2017-12-12', '09:00', 8, 'Lunes a Viernes, 9am - 5pm', 'V15901234', '04262221100'),
+('Adriana Reyes', 'Desarrolladora', '2021-06-25', '09:30', 7, 'Lunes a Viernes, 9:30am - 4:30pm', 'V26123457', '04148887766'),
+('Santiago García', 'Soporte Técnico', '2020-01-13', '08:00', 8, 'Lunes a Viernes, 8am - 4pm', 'V23234568', '04243332211'),
+('Verónica Ríos', 'Recursos Humanos', '2019-04-17', '09:00', 7, 'Lunes a Viernes, 9am - 4pm', 'V19345679', '04121110099');
