@@ -85,4 +85,7 @@ Una vez creado click derecho en el servidor, create => database => Escribe exact
 
  -g @nestjs/cli
 
+ pdfmake@0.2.10
+ --save-dev @types/pdfkit
+
 ```

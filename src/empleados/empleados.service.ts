@@ -11,6 +11,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Empleado } from './entities/empleado.entity';
 import { IErrorsTypeORM } from 'src/interfaces/error.response';
+import { PrinterService } from 'src/printer/printer.service';
+import { employementLetterReportByID } from 'src/reports/employementLetterByID.report';
 
 @Injectable()
 export class EmpleadosService {
@@ -19,6 +21,7 @@ export class EmpleadosService {
   constructor(
     @InjectRepository(Empleado)
     private readonly EmpleadoRepository: Repository<Empleado>,
+    private readonly PrinterService: PrinterService,
   ) {}
   async create(createEmpleadoDto: CreateEmpleadoDto) {
     try {
@@ -42,11 +45,11 @@ export class EmpleadosService {
     if (!isNaN(+id)) {
       empleado = await this.EmpleadoRepository.findOneBy({ id: +id });
     } else {
-      const queryBuilder = this.EmpleadoRepository.createQueryBuilder('prod');
+      const queryBuilder = this.EmpleadoRepository.createQueryBuilder();
 
       empleado = await queryBuilder
-        .where(`UPPER(name) =:title`, {
-          title: id.toUpperCase(),
+        .where(`UPPER(name) =:name`, {
+          name: id.toUpperCase(),
         })
         .getOne();
     }
@@ -70,6 +73,29 @@ export class EmpleadosService {
       throw new BadRequestException(`No hay empleado con este "${id}" ID`);
 
     return empleado;
+  }
+
+  async ConstanciaEmpleadoByID(id: string) {
+    const employee = await this.findOne(id);
+
+    if (!employee) {
+      throw new BadRequestException(`No hay ningun empleado con este id ${id}`);
+    }
+
+    console.log(employee);
+    const docDefinition = employementLetterReportByID({
+      employerName: 'Carlos Medina',
+      employerPosition: 'Director',
+      employerCompany: 'Santisimo Salvador',
+      employeeName: employee.name,
+      employeeCedula: employee.cedula,
+      employeePosition: employee.position,
+      employeeStartDate: employee.start_date,
+      employeeHours: employee.hours_per_day,
+      employeeWorkSchedule: employee.work_schedule,
+    });
+
+    return this.PrinterService.createPdf(docDefinition);
   }
 
   async update(id: string, updateEmpleadoDto: UpdateEmpleadoDto) {

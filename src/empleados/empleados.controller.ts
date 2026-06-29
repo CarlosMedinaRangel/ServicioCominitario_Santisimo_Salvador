@@ -6,10 +6,12 @@ import {
   Patch,
   Param,
   Delete,
+  Res,
 } from '@nestjs/common';
 import { EmpleadosService } from './empleados.service';
 import { CreateEmpleadoDto } from './dto/create-empleado.dto';
 import { UpdateEmpleadoDto } from './dto/update-empleado.dto';
+import type { Response } from 'express';
 
 @Controller('empleados')
 export class EmpleadosController {
@@ -29,6 +31,20 @@ export class EmpleadosController {
   findOne(@Param('id') id: string) {
     return this.empleadosService.findOne(id);
   }
+
+    @Get('Constancia-Empleado/:id')
+    async ConstanciaEmpleadoByID(
+      @Res() response: Response,
+      @Param('id') id: string,
+    ) {
+      const pdfDoc = await this.empleadosService.ConstanciaEmpleadoByID(id);
+  
+      // Configura las cabeceras correctamente
+      response.setHeader('Content-Type', 'application/pdf');
+      pdfDoc.info.Title = 'employement-letter.pdf';
+      pdfDoc.pipe(response);
+      pdfDoc.end();
+    }
 
   @Patch(':id')
   update(
