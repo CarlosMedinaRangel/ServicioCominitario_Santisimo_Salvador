@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { BasicReportsModule } from './basic-reports/basic-reports.module';
 import { PrinterModule } from './printer/printer.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -28,6 +29,8 @@ import { PrinterModule } from './printer/printer.module';
     BasicReportsModule,
 
     PrinterModule,
+
+    AuthModule,
   ],
 })
 export class AppModule {}

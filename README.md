@@ -88,4 +88,10 @@ Una vez creado click derecho en el servidor, create => database => Escribe exact
  pdfmake@0.2.10
  --save-dev @types/pdfkit
 
+ @nestjs/passport passport
+
+@nestjs/jwt passport-jwt
+
+ bcrypt
+
 ```
