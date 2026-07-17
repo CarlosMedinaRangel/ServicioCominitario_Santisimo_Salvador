@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   Res,
   UploadedFile,
   UseInterceptors,
@@ -21,6 +22,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiProduces,
+  ApiQuery,
   ApiResponse,
   ApiTags,
   ApiConsumes,
@@ -204,11 +206,35 @@ export class EmpleadosController {
   }
 
   @Get('Constancia-Empleado/:id')
-  @ApiOperation({ summary: 'Descargar constancia de trabajo en formato PDF' })
+  @ApiOperation({ summary: 'Descargar constancia de trabajo en formato PDF. Opcional: ?month=YYYY-MM para incluir actividades del mes.' })
   @ApiParam({
     name: 'id',
     description: 'UUID (userId) o cédula del empleado',
     example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiQuery({
+    name: 'month',
+    required: false,
+    description: 'Mes en formato YYYY-MM para incluir actividades del periodo',
+    example: '2026-07',
+  })
+  @ApiQuery({
+    name: 'employerName',
+    required: false,
+    description: 'Nombre de quien firma (default: Carlos Medina)',
+    example: 'Maria Lopez',
+  })
+  @ApiQuery({
+    name: 'employerPosition',
+    required: false,
+    description: 'Cargo de quien firma (default: Director)',
+    example: 'Subdirectora',
+  })
+  @ApiQuery({
+    name: 'employerCompany',
+    required: false,
+    description: 'Nombre de la institución (default: Santisimo Salvador)',
+    example: 'Colegio Santisimo Salvador',
   })
   @ApiProduces('application/pdf')
   @ApiResponse({
@@ -223,11 +249,20 @@ export class EmpleadosController {
   async ConstanciaEmpleadoByID(
     @Res() response: Response,
     @Param('id') id: string,
+    @Query('month') month?: string,
+    @Query('employerName') employerName?: string,
+    @Query('employerPosition') employerPosition?: string,
+    @Query('employerCompany') employerCompany?: string,
   ) {
-    const pdfDoc = await this.empleadosService.ConstanciaEmpleadoByID(id);
+    const pdfDoc = await this.empleadosService.ConstanciaEmpleadoByID(id, {
+      month,
+      employerName,
+      employerPosition,
+      employerCompany,
+    });
 
     response.setHeader('Content-Type', 'application/pdf');
-    pdfDoc.info.Title = 'employment-letter.pdf';
+    pdfDoc.info.Title = month ? `constancia-${month}.pdf` : 'employment-letter.pdf';
     pdfDoc.pipe(response);
     pdfDoc.end();
   }

@@ -8,7 +8,7 @@ import {
 import { CreateEmpleadoDto } from './dto/create-empleado.dto';
 import { UpdateEmpleadoDto } from './dto/update-empleado.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { Employee } from './entities/employee.entity';
 import { Schedule } from './entities/schedule.entity';
 import { Group } from './entities/group.entity';
@@ -17,6 +17,7 @@ import { User } from 'src/auth/entities/auth.entity';
 import { IErrorsTypeORM } from 'src/interfaces/error.response';
 import { PrinterService } from 'src/printer/printer.service';
 import { employementLetterReportByID } from 'src/reports/employementLetterByID.report';
+import { constanciaMensualReport } from 'src/reports/constanciaMensual.report';
 import * as bcrypt from 'bcrypt';
 import * as XLSX from 'xlsx';
 
@@ -137,14 +138,56 @@ export class EmpleadosService {
     });
   }
 
-  async ConstanciaEmpleadoByID(id: string) {
+  async ConstanciaEmpleadoByID(id: string, options?: { month?: string; employerName?: string; employerPosition?: string; employerCompany?: string }) {
     const employee = await this.findOne(id);
     const user = employee.user;
 
+    const employerName = options?.employerName || 'Carlos Medina';
+    const employerPosition = options?.employerPosition || 'Director';
+    const employerCompany = options?.employerCompany || 'Santisimo Salvador';
+
+    if (options?.month) {
+      const [yearStr, monthStr] = options.month.split('-');
+      const year = parseInt(yearStr, 10);
+      const mes = parseInt(monthStr, 10);
+
+      const startDate = new Date(year, mes - 1, 1);
+      const endDate = new Date(year, mes, 0, 23, 59, 59);
+
+      const activities = await this.activityRepository.find({
+        where: {
+          employeeId: employee.userId,
+          timestamp: Between(startDate, endDate),
+        },
+        order: { timestamp: 'DESC' },
+      });
+
+      const docDefinition = constanciaMensualReport({
+        employerName,
+        employerPosition,
+        employerCompany,
+        employeeName: user.fullName,
+        employeeCedula: user.cedula || 'N/A',
+        employeePosition: employee.position,
+        employeeStartDate: employee.start_date,
+        employeeHours: employee.hours_per_day,
+        employeeWorkSchedule: employee.work_schedule,
+        month: `${monthStr}-${yearStr}`,
+        activities: activities.map((a) => ({
+          tipo: a.tipo,
+          descripcion: a.descripcion,
+          detalle: a.detalle,
+          timestamp: a.timestamp,
+        })),
+      });
+
+      return this.PrinterService.createPdf(docDefinition);
+    }
+
     const docDefinition = employementLetterReportByID({
-      employerName: 'Carlos Medina',
-      employerPosition: 'Director',
-      employerCompany: 'Santisimo Salvador',
+      employerName,
+      employerPosition,
+      employerCompany,
       employeeName: user.fullName,
       employeeCedula: user.cedula || 'N/A',
       employeePosition: employee.position,
