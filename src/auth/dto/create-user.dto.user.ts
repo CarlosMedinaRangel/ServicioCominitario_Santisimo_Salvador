@@ -1,6 +1,7 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
+  IsOptional,
   IsString,
   Matches,
   MaxLength,
@@ -39,4 +40,22 @@ export class CreateUserDto {
   @IsString()
   @MinLength(1)
   fullName!: string;
+
+  @ApiPropertyOptional({
+    example: 'V12345678',
+    description: 'Cédula de identidad (se normalizará automáticamente)',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  cedula?: string;
+
+  @ApiPropertyOptional({
+    example: '04121234567',
+    description: 'Número de teléfono',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  telefono?: string;
 }

@@ -60,9 +60,27 @@ export class AuthController {
     return this.authService.login(LoginUserDto);
   }
 
+  @Get('me/employee')
+  @Auth()
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Obtener perfil de empleado del usuario autenticado',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Perfil de empleado obtenido exitosamente.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized. Token ausente, inválido o expirado.',
+  })
+  getMyEmployeeProfile(@GetUser() user: User) {
+    return this.authService.getMyEmployeeProfile(user.id);
+  }
+
   @Get('check-status')
   @Auth()
-  @ApiBearerAuth() // Le dice a Swagger que este endpoint requiere Token
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Verificar el estado de autenticación y renovar JWT',
   })
@@ -79,7 +97,7 @@ export class AuthController {
   }
 
   @Get('private')
-  @UseGuards(AuthGuard())
+  @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Ruta privada de prueba 1 (Requiere cualquier token válido)',
@@ -104,7 +122,7 @@ export class AuthController {
 
   @Get('private2')
   @RoleProtected(ValidRoles.admin)
-  @UseGuards(AuthGuard(), UserRoleGuard)
+  @UseGuards(AuthGuard('jwt'), UserRoleGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Ruta privada de prueba 2 (Requiere rol de Admin)' })
   @ApiResponse({ status: 200, description: 'Acceso permitido' })

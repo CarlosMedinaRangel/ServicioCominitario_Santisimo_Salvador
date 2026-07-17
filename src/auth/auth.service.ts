@@ -22,6 +22,7 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
   ) {}
+
   async create(CreateUserDto: CreateUserDto) {
     try {
       const { password, ...UserData } = CreateUserDto;
@@ -37,8 +38,6 @@ export class AuthService {
         ...userinfo,
         token: this.getJWTToken({ id: user.id }),
       };
-
-      //TODO: JWT
     } catch (error: any) {
       this.handleDBErrors(error);
     }
@@ -49,25 +48,65 @@ export class AuthService {
 
     const user = await this.userRepository.findOne({
       where: { email },
-      select: { email: true, password: true, id: true },
+      relations: { employee: true },
+      select: {
+        email: true,
+        password: true,
+        id: true,
+        fullName: true,
+        isActive: true,
+        roles: true,
+        cedula: true,
+        telefono: true,
+      },
     });
 
     if (!user) {
-      throw new UnauthorizedException(`Credential are not valid(email)`);
+      throw new UnauthorizedException(`Credenciales inválidas`);
     }
 
     if (!bcrypt.compareSync(password, user.password)) {
-      throw new UnauthorizedException(`Credential are not valid(Password)`);
+      throw new UnauthorizedException(`Credenciales inválidas`);
     }
+    const { password: _, ...userInfo } = user;
     return {
-      ...user,
+      ...userInfo,
       token: this.getJWTToken({ id: user.id }),
+    };
+  }
+
+  async getMyEmployeeProfile(userId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: {
+        employee: {
+          schedules: true,
+          groups: true,
+          activities: true,
+        },
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        cedula: user.cedula,
+        telefono: user.telefono,
+        isActive: user.isActive,
+        roles: user.roles,
+      },
+      employee: user.employee || null,
     };
   }
 
   private getJWTToken(payload: JwtPayload) {
     const token = this.jwtService.sign(payload);
-
     return token;
   }
 
