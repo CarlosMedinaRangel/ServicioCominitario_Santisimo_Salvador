@@ -8,7 +8,13 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/');
 
-  app.enableCors();
+  app.enableCors({
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    allowedHeaders: 'Content-Type,Authorization',
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -20,8 +26,9 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Servicio Comunitario RESTFul API')
     .setDescription('Servicio Comunitaro EndPoints')
-    .setVersion('0.2')
-    .addTag('cats')
+    .setVersion('0.3')
+    .addTag('auth')
+    .addBearerAuth()
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
