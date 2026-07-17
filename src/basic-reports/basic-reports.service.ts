@@ -1,9 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { EmpleadosService } from 'src/empleados/empleados.service';
 
-import PDFprinter from 'pdfmake';
-import { TDocumentDefinitions } from 'src/interfaces/pdfmake.interface';
 import { PrinterService } from 'src/printer/printer.service';
+import { TDocumentDefinitions } from 'src/interfaces/pdfmake.interface';
 import { getHelloWorldReport } from 'src/reports/helloWorld.report';
 import { employementLetterReportByID } from 'src/reports/employementLetterByID.report';
 
@@ -20,10 +19,8 @@ const fonts = {
 export class BasicReportsService {
   constructor(
     private readonly EmpleadoService: EmpleadosService,
-
     private readonly PrinterService: PrinterService,
   ) {}
-  //
 
   hello() {
     const docDefinitions: TDocumentDefinitions = getHelloWorldReport({
@@ -42,13 +39,14 @@ export class BasicReportsService {
       throw new BadRequestException(`No hay ningun empleado con este id ${id}`);
     }
 
-    console.log(employee);
+    const user = employee.user;
+
     const docDefinition = employementLetterReportByID({
       employerName: 'Carlos Medina',
       employerPosition: 'Director',
       employerCompany: 'Santisimo Salvador',
-      employeeName: employee.name,
-      employeeCedula: employee.cedula,
+      employeeName: user.fullName,
+      employeeCedula: user.cedula || 'N/A',
       employeePosition: employee.position,
       employeeStartDate: employee.start_date,
       employeeHours: employee.hours_per_day,

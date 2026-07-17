@@ -1,44 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import {
   IsDate,
   IsNumber,
   IsPositive,
   IsString,
-  Matches,
+  IsUUID,
   MinLength,
 } from 'class-validator';
 
 export class CreateEmpleadoDto {
   @ApiProperty({
-    example: 'Juan Pérez',
-    description: 'Nombre completo del empleado',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'UUID del usuario al que pertenece este empleado',
   })
   @IsString()
-  @MinLength(1)
-  name!: string;
-
-  @ApiProperty({
-    example: 'V20123456',
-    description:
-      'Cédula de identidad del empleado (se normalizará automáticamente a mayúsculas y con la V)',
-  })
-  @IsString()
-  @MinLength(1)
-  cedula!: string;
-
-  @ApiProperty({
-    example: '04141234567',
-    description:
-      'Número de teléfono móvil. Debe incluir un prefijo válido (0414, 0424, 0412, 0422, 0416, 0426) y tener 11 dígitos.',
-  })
-  @IsString({ message: 'El teléfono debe ser texto' })
-  @Transform(({ value }) => value.replace(/\D/g, '')) // limpia antes de validar
-  @Matches(/^(0414|0424|0412|0422|0416|0426)\d{7}$/, {
-    message:
-      'Formato de teléfono inválido. Debe ser uno de los prefijos (0414,0424,0412,0422,0416,0426) seguido de 7 dígitos.',
-  })
-  telefono!: string;
+  @IsUUID()
+  userId!: string;
 
   @ApiProperty({
     example: 'Desarrollador Backend',

@@ -9,86 +9,144 @@ import { CreateEmpleadoDto } from './dto/create-empleado.dto';
 import { UpdateEmpleadoDto } from './dto/update-empleado.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Empleado } from './entities/empleado.entity';
+import { Employee } from './entities/employee.entity';
+import { Schedule } from './entities/schedule.entity';
+import { Group } from './entities/group.entity';
+import { Activity } from './entities/activity.entity';
+import { User } from 'src/auth/entities/auth.entity';
 import { IErrorsTypeORM } from 'src/interfaces/error.response';
 import { PrinterService } from 'src/printer/printer.service';
 import { employementLetterReportByID } from 'src/reports/employementLetterByID.report';
+import * as bcrypt from 'bcrypt';
+import * as XLSX from 'xlsx';
+
+export interface UploadError {
+  row: number;
+  field: string;
+  message: string;
+}
+
+export interface UploadResult {
+  success: boolean;
+  created: number;
+  updated: number;
+  errors: UploadError[];
+}
 
 @Injectable()
 export class EmpleadosService {
   private readonly logger = new Logger('EmpleadosService');
 
   constructor(
-    @InjectRepository(Empleado)
-    private readonly EmpleadoRepository: Repository<Empleado>,
+    @InjectRepository(Employee)
+    private readonly employeeRepository: Repository<Employee>,
+    @InjectRepository(Schedule)
+    private readonly scheduleRepository: Repository<Schedule>,
+    @InjectRepository(Group)
+    private readonly groupRepository: Repository<Group>,
+    @InjectRepository(Activity)
+    private readonly activityRepository: Repository<Activity>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly PrinterService: PrinterService,
   ) {}
+
   async create(createEmpleadoDto: CreateEmpleadoDto) {
     try {
-      const empleado = this.EmpleadoRepository.create(createEmpleadoDto);
-      await this.EmpleadoRepository.save(empleado);
-
-      return empleado;
+      const user = await this.userRepository.findOneBy({
+        id: createEmpleadoDto.userId,
+      });
+      if (!user) {
+        throw new BadRequestException(
+          `No existe un usuario con id ${createEmpleadoDto.userId}`,
+        );
+      }
+      const employee = this.employeeRepository.create({
+        userId: user.id,
+        position: createEmpleadoDto.position,
+        start_date: createEmpleadoDto.start_date as any,
+        work_time: createEmpleadoDto.work_time,
+        hours_per_day: createEmpleadoDto.hours_per_day,
+        work_schedule: createEmpleadoDto.work_schedule,
+      });
+      await this.employeeRepository.save(employee);
+      return this.employeeRepository.findOne({
+        where: { userId: employee.userId },
+        relations: { user: true },
+      });
     } catch (error: any) {
       this.handleExceptions(error);
     }
   }
 
   async findAll() {
-    const empleados = await this.EmpleadoRepository.find({});
-    return empleados;
+    return this.employeeRepository.find({ relations: { user: true } });
   }
 
   async findOne(id: string) {
-    let empleado: Empleado | null = null;
+    let employee: Employee | null = null;
 
-    if (!isNaN(+id)) {
-      empleado = await this.EmpleadoRepository.findOneBy({ id: +id });
-    } else {
-      const queryBuilder = this.EmpleadoRepository.createQueryBuilder();
-
-      empleado = await queryBuilder
-        .where(`UPPER(name) =:name`, {
-          name: id.toUpperCase(),
-        })
-        .getOne();
+    // Try UUID format (userId)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(id)) {
+      employee = await this.employeeRepository.findOne({
+        where: { userId: id },
+        relations: { user: true },
+      });
     }
 
-    if (!empleado) {
-      const queryBuilder = this.EmpleadoRepository.createQueryBuilder();
-      let cedulaLimpia = id.replace(/\./g, '');
-      cedulaLimpia = cedulaLimpia.toUpperCase();
+    // Try cedula lookup
+    if (!employee) {
+      let cedulaLimpia = id.replace(/\./g, '').toUpperCase();
       if (!cedulaLimpia.startsWith('V')) {
         cedulaLimpia = 'V' + cedulaLimpia;
       }
-
-      empleado = await queryBuilder
-        .where(`"cedula" =:term`, {
-          term: cedulaLimpia,
-        })
-        .getOne();
+      const user = await this.userRepository.findOneBy({ cedula: cedulaLimpia });
+      if (user) {
+        employee = await this.employeeRepository.findOne({
+          where: { userId: user.id },
+          relations: { user: true },
+        });
+      }
     }
 
-    if (!empleado)
+    if (!employee) {
       throw new BadRequestException(`No hay empleado con este "${id}" ID`);
+    }
 
-    return empleado;
+    return employee;
+  }
+
+  async findSchedules(employeeId: string) {
+    return this.scheduleRepository.find({
+      where: { employeeId },
+      order: { dia: 'ASC', horaInicio: 'ASC' },
+    });
+  }
+
+  async findGroups(employeeId: string) {
+    return this.groupRepository.find({
+      where: { employeeId },
+    });
+  }
+
+  async findActivities(employeeId: string) {
+    return this.activityRepository.find({
+      where: { employeeId },
+      order: { timestamp: 'DESC' },
+    });
   }
 
   async ConstanciaEmpleadoByID(id: string) {
     const employee = await this.findOne(id);
+    const user = employee.user;
 
-    if (!employee) {
-      throw new BadRequestException(`No hay ningun empleado con este id ${id}`);
-    }
-
-    console.log(employee);
     const docDefinition = employementLetterReportByID({
       employerName: 'Carlos Medina',
       employerPosition: 'Director',
       employerCompany: 'Santisimo Salvador',
-      employeeName: employee.name,
-      employeeCedula: employee.cedula,
+      employeeName: user.fullName,
+      employeeCedula: user.cedula || 'N/A',
       employeePosition: employee.position,
       employeeStartDate: employee.start_date,
       employeeHours: employee.hours_per_day,
@@ -99,38 +157,197 @@ export class EmpleadosService {
   }
 
   async update(id: string, updateEmpleadoDto: UpdateEmpleadoDto) {
-    const empelado = await this.EmpleadoRepository.preload({
-      id: +id,
+    const employee = await this.findOne(id);
+
+    const updated = await this.employeeRepository.preload({
+      userId: employee.userId,
       ...updateEmpleadoDto,
     });
 
-    if (!empelado) {
-      throw new NotFoundException(`El empleado con el id ${id} no se encontró`);
+    if (!updated) {
+      throw new NotFoundException(
+        `El empleado con el id ${id} no se encontró`,
+      );
     }
 
     try {
-      const result = await this.EmpleadoRepository.save(empelado);
-      return result;
+      const result = await this.employeeRepository.save(updated);
+      return this.employeeRepository.findOne({
+        where: { userId: result.userId },
+        relations: { user: true },
+      });
     } catch (error: any) {
       this.handleExceptions(error);
     }
   }
 
   async remove(id: string) {
-    const empleado = await this.findOne(id);
-
-    if (!empleado) {
-      throw new BadRequestException(
-        `No existe ningun  empleado con el termino proporcionado "${id}" `,
-      );
-    }
+    const employee = await this.findOne(id);
 
     try {
-      const result = await this.EmpleadoRepository.remove(empleado);
+      await this.employeeRepository.remove(employee);
       return `Eliminado`;
     } catch (error: any) {
       this.handleExceptions(error);
     }
+  }
+
+  async uploadFile(
+    file: Express.Multer.File,
+    mapping: Record<string, number>,
+  ): Promise<UploadResult> {
+    const workbook = XLSX.read(file.buffer, { type: 'buffer', cellDates: true });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+    const rows = jsonData
+      .slice(1)
+      .filter((r) => r.some((cell) => cell !== undefined && cell !== null && cell !== ''));
+
+    let created = 0;
+    let updated = 0;
+    const errors: UploadError[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2;
+
+      try {
+        const data = this.extractRowData(row, mapping);
+
+        if (!data.email && !data.cedula) {
+          errors.push({
+            row: rowNum,
+            field: 'email/cedula',
+            message: 'Email o cédula es requerido',
+          });
+          continue;
+        }
+
+        // Find or create user
+        let user: User | null = null;
+        if (data.email) {
+          user = await this.userRepository.findOneBy({
+            email: String(data.email).toLowerCase().trim(),
+          });
+        }
+        if (!user && data.cedula) {
+          let cedulaLookup = String(data.cedula).replace(/\./g, '').toUpperCase();
+          if (!cedulaLookup.startsWith('V')) cedulaLookup = 'V' + cedulaLookup;
+          user = await this.userRepository.findOneBy({ cedula: cedulaLookup });
+        }
+
+        if (user) {
+          // Update existing user
+          const userUpdates: Partial<User> = {};
+          if (data.fullName) userUpdates.fullName = String(data.fullName);
+          if (data.email) userUpdates.email = String(data.email).toLowerCase().trim();
+          if (data.cedula) {
+            let c = String(data.cedula).replace(/\./g, '').toUpperCase();
+            if (!c.startsWith('V')) c = 'V' + c;
+            userUpdates.cedula = c;
+          }
+          if (data.telefono)
+            userUpdates.telefono = String(data.telefono).replace(/\D/g, '');
+          await this.userRepository.save({ ...user, ...userUpdates });
+        } else {
+          // Create new user
+          const password = data.password
+            ? String(data.password)
+            : `${data.cedula || 'Default'}123!`;
+          user = this.userRepository.create({
+            email: String(data.email || `${data.cedula}@santisimo.edu`).toLowerCase().trim(),
+            password: bcrypt.hashSync(password, 10),
+            fullName: String(data.fullName || data.name || 'Sin Nombre'),
+            roles: ['user'],
+            isActive: true,
+          });
+          if (data.cedula) {
+            let c = String(data.cedula).replace(/\./g, '').toUpperCase();
+            if (!c.startsWith('V')) c = 'V' + c;
+            user.cedula = c;
+          }
+          if (data.telefono)
+            user.telefono = String(data.telefono).replace(/\D/g, '');
+          user = await this.userRepository.save(user);
+        }
+
+        // Find or create employee
+        let employee = await this.employeeRepository.findOneBy({
+          userId: user.id,
+        });
+
+        const employeeData: Partial<Employee> = {
+          position: data.position ? String(data.position) : 'General',
+          start_date: data.start_date
+            ? (this.formatDateValue(data.start_date) as any)
+            : (new Date().toISOString().split('T')[0] as any),
+          work_time: data.work_time ? String(data.work_time) : '08:00:00',
+          hours_per_day: data.hours_per_day ? Number(data.hours_per_day) : 8,
+          work_schedule: data.work_schedule
+            ? String(data.work_schedule)
+            : 'Lunes a Viernes, 8am - 4pm',
+        };
+
+        if (employee) {
+          await this.employeeRepository.save({
+            ...employee,
+            ...employeeData,
+            userId: user.id,
+          });
+          updated++;
+        } else {
+          const newEmployee = this.employeeRepository.create({
+            userId: user.id,
+            ...employeeData,
+          } as Employee);
+          await this.employeeRepository.save(newEmployee);
+          created++;
+        }
+      } catch (error: any) {
+        errors.push({
+          row: rowNum,
+          field: 'general',
+          message: error.message ?? 'Error desconocido',
+        });
+      }
+    }
+
+    return { success: errors.length === 0, created, updated, errors };
+  }
+
+  private extractRowData(
+    row: unknown[],
+    mapping: Record<string, number>,
+  ): Record<string, unknown> {
+    const data: Record<string, unknown> = {};
+    for (const [field, colIndex] of Object.entries(mapping)) {
+      if (colIndex >= 0 && colIndex < row.length) {
+        data[field] = row[colIndex];
+      }
+    }
+    return data;
+  }
+
+  private formatDateValue(value: unknown): string {
+    if (value instanceof Date) {
+      return value.toISOString().split('T')[0];
+    }
+    if (typeof value === 'number') {
+      const date = XLSX.SSF?.parse_date_code?.(value);
+      if (date?.y && date?.m && date?.d) {
+        return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+      }
+    }
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().split('T')[0];
+      }
+      return value;
+    }
+    return '';
   }
 
   private handleExceptions(error: IErrorsTypeORM) {
