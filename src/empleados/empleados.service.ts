@@ -393,6 +393,53 @@ export class EmpleadosService {
     return '';
   }
 
+  async seedActivities(employeeId: string, month: string) {
+    const employee = await this.findOne(employeeId);
+
+    const [yearStr, monthStr] = month.split('-');
+    const year = parseInt(yearStr, 10);
+    const mes = parseInt(monthStr, 10);
+
+    const activityTypes = [
+      'Clase Impartida', 'Reunión', 'Corrección de Evaluaciones',
+      'Planificación', 'Laboratorio', 'Tutoría',
+    ];
+    const descriptions = [
+      'Matemáticas Básicas', 'Biología Molecular', 'Historia Universal',
+      'Lengua y Literatura', 'Física General', 'Química Orgánica',
+      'Inglés Avanzado', 'Educación Física', 'Arte y Cultura',
+    ];
+    const details = [
+      'Grupo A', 'Grupo B', 'Grupo C', 'Salón 101', 'Salón 203',
+      'Laboratorio 1', 'Aula Virtual', 'Biblioteca',
+    ];
+
+    const activities: Activity[] = [];
+    const count = 3 + Math.floor(Math.random() * 3);
+
+    for (let i = 0; i < count; i++) {
+      const day = 1 + Math.floor(Math.random() * 28);
+      const hour = 7 + Math.floor(Math.random() * 10);
+      const timestamp = new Date(year, mes - 1, day, hour, 0, 0);
+
+      const tipo = activityTypes[Math.floor(Math.random() * activityTypes.length)];
+      const descripcion = descriptions[Math.floor(Math.random() * descriptions.length)];
+      const detalle = details[Math.floor(Math.random() * details.length)];
+
+      const activity = this.activityRepository.create({
+        employeeId: employee.userId,
+        tipo,
+        descripcion,
+        detalle,
+        timestamp,
+        destacada: Math.random() > 0.7,
+      });
+      activities.push(activity);
+    }
+
+    return this.activityRepository.save(activities);
+  }
+
   private handleExceptions(error: IErrorsTypeORM) {
     if (error.code === '23505') throw new BadRequestException(error.detail);
     this.logger.error(error);

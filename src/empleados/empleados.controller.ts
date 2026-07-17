@@ -205,6 +205,28 @@ export class EmpleadosController {
     return this.empleadosService.findActivities(id);
   }
 
+  @Post(':id/activities/seed')
+  @Auth()
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Generar actividades de prueba para un empleado en un mes' })
+  @ApiQuery({
+    name: 'month',
+    required: false,
+    description: 'Mes en formato YYYY-MM (default: mes actual)',
+    example: '2026-07',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Actividades de prueba generadas.',
+  })
+  seedActivities(
+    @Param('id') id: string,
+    @Query('month') month?: string,
+  ) {
+    const targetMonth = month || new Date().toISOString().slice(0, 7);
+    return this.empleadosService.seedActivities(id, targetMonth);
+  }
+
   @Get('Constancia-Empleado/:id')
   @ApiOperation({ summary: 'Descargar constancia de trabajo en formato PDF. Opcional: ?month=YYYY-MM para incluir actividades del mes.' })
   @ApiParam({
