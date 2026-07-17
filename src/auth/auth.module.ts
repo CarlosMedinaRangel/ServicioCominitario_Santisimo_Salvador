@@ -24,7 +24,7 @@ import { JwtStrategy } from './strategies/jew.strategy';
         return {
           secret: ConfigService.get('JWT_SECRET'),
           signOptions: {
-            expiresIn: '2h',
+            expiresIn: ConfigService.get('JWT_EXPIRES_IN') || '2h',
           },
         };
       },

@@ -1,12 +1,13 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   BeforeInsert,
   BeforeUpdate,
   Column,
   Entity,
-  OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Employee } from '../../empleados/entities/employee.entity';
 
 @Entity('users')
 export class User {
@@ -41,6 +42,20 @@ export class User {
   @Column('text')
   fullName!: string;
 
+  @ApiPropertyOptional({
+    example: 'V12345678',
+    description: 'Cédula de identidad (única, común a todos los tipos de usuario)',
+  })
+  @Column('text', { unique: true, nullable: true })
+  cedula?: string;
+
+  @ApiPropertyOptional({
+    example: '04121234567',
+    description: 'Número de teléfono',
+  })
+  @Column('text', { nullable: true })
+  telefono?: string;
+
   @ApiProperty({
     example: true,
     description: 'Indica si el usuario está activo en el sistema',
@@ -58,9 +73,16 @@ export class User {
   @Column('text', { array: true, default: ['user'] })
   roles!: string[];
 
+  @OneToOne(() => Employee, (employee) => employee.user)
+  employee?: Employee;
+
   @BeforeInsert()
   checkFilesBeforeInsert() {
     this.email = this.email.toLowerCase().trim();
+    if (this.cedula) {
+      this.cedula = this.cedula.replace(/\./g, '').toUpperCase();
+      if (!this.cedula.startsWith('V')) this.cedula = 'V' + this.cedula;
+    }
   }
 
   @BeforeUpdate()

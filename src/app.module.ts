@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { BasicReportsModule } from './basic-reports/basic-reports.module';
 import { PrinterModule } from './printer/printer.module';
 import { AuthModule } from './auth/auth.module';
+import { SeedModule } from './seed/seed.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { AuthModule } from './auth/auth.module';
     PrinterModule,
 
     AuthModule,
+    SeedModule,
   ],
 })
 export class AppModule {}
