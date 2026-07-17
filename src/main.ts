@@ -8,8 +8,9 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/');
 
+  const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: [frontendOrigin, 'http://localhost:5173', 'http://127.0.0.1:5173'],
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: 'Content-Type,Authorization',
@@ -33,6 +34,13 @@ async function bootstrap() {
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.BACKEND_PORT || process.env.PORT || 3000;
+  const devHost = process.env.DEV_HOST || 'localhost';
+
+  if (devHost === 'localhost') {
+    await app.listen(port);
+  } else {
+    await app.listen(port, '0.0.0.0');
+  }
 }
 bootstrap();
