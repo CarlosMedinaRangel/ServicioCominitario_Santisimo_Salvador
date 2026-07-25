@@ -5,6 +5,7 @@
 
 
 /postgres
+/pgadmin
 .env
 
 # Logs

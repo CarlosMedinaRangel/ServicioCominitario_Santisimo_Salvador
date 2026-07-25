@@ -5,6 +5,8 @@ import { ConfigModule } from '@nestjs/config';
 import { BasicReportsModule } from './basic-reports/basic-reports.module';
 import { PrinterModule } from './printer/printer.module';
 import { AuthModule } from './auth/auth.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { FilesController } from './files/files.controller';
 
 @Module({
   imports: [
@@ -31,6 +33,9 @@ import { AuthModule } from './auth/auth.module';
     PrinterModule,
 
     AuthModule,
+
+    CloudinaryModule,
   ],
+  controllers: [FilesController],
 })
 export class AppModule {}

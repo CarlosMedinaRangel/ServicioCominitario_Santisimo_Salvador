@@ -13,6 +13,7 @@ import { Empleado } from './entities/empleado.entity';
 import { IErrorsTypeORM } from 'src/interfaces/error.response';
 import { PrinterService } from 'src/printer/printer.service';
 import { employementLetterReportByID } from 'src/reports/employementLetterByID.report';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 @Injectable()
 export class EmpleadosService {
@@ -22,10 +23,20 @@ export class EmpleadosService {
     @InjectRepository(Empleado)
     private readonly EmpleadoRepository: Repository<Empleado>,
     private readonly PrinterService: PrinterService,
+
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
-  async create(createEmpleadoDto: CreateEmpleadoDto) {
+  async create(
+    secureUrl: string,
+    publicId: string,
+    createEmpleadoDto: CreateEmpleadoDto,
+  ) {
     try {
-      const empleado = this.EmpleadoRepository.create(createEmpleadoDto);
+      const empleado = this.EmpleadoRepository.create({
+        ...createEmpleadoDto,
+        imagen: secureUrl,
+        publicId: publicId,
+      });
       await this.EmpleadoRepository.save(empleado);
 
       return empleado;
@@ -98,19 +109,37 @@ export class EmpleadosService {
     return this.PrinterService.createPdf(docDefinition);
   }
 
-  async update(id: string, updateEmpleadoDto: UpdateEmpleadoDto) {
-    const empelado = await this.EmpleadoRepository.preload({
+  async update(
+    id: string,
+    secureUrl: string | undefined,
+    publicId: string | undefined,
+    updateEmpleadoDto: UpdateEmpleadoDto,
+  ) {
+    // Primero busca sin mezclar el DTO para leer el publicId real de la BD
+    const empleadoActual = await this.EmpleadoRepository.findOneBy({ id: +id });
+
+    if (!empleadoActual) {
+      throw new NotFoundException(`El empleado con el id ${id} no se encontró`);
+    }
+
+    // Borra imagen anterior solo si viene una nueva
+    if (secureUrl && empleadoActual.publicId) {
+      await this.cloudinaryService.deleteFile(empleadoActual.publicId);
+    }
+
+    // Ahora sí hace el preload para merge con el DTO
+    const empleado = await this.EmpleadoRepository.preload({
       id: +id,
       ...updateEmpleadoDto,
+      ...(secureUrl ? { imagen: secureUrl, publicId } : {}),
     });
 
-    if (!empelado) {
+    if (!empleado) {
       throw new NotFoundException(`El empleado con el id ${id} no se encontró`);
     }
 
     try {
-      const result = await this.EmpleadoRepository.save(empelado);
-      return result;
+      return await this.EmpleadoRepository.save(empleado);
     } catch (error: any) {
       this.handleExceptions(error);
     }

@@ -56,7 +56,7 @@ export class Empleado {
 
   @ApiProperty({
     example: '09:00',
-    description: `Hora de entrada / inicio del turno del empleado`, 
+    description: `Hora de entrada / inicio del turno del empleado`,
   })
   @Column({ type: 'time' })
   work_time!: string;
@@ -65,7 +65,7 @@ export class Empleado {
     example: 8,
     description: `Cuantas horas laborales cumple el empleado al dia`,
   })
-  @Column({ type: 'int' })
+  @Column({ type: 'int', nullable: true })
   hours_per_day!: number;
 
   @ApiProperty({
@@ -74,6 +74,12 @@ export class Empleado {
   })
   @Column({ type: 'varchar', length: 50 })
   work_schedule!: string;
+
+  @Column('text', { unique: true, nullable: true })
+  imagen?: string;
+
+  @Column({ nullable: true })
+  publicId?: string;
 
   @BeforeInsert()
   @BeforeUpdate()

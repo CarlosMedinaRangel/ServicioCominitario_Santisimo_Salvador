@@ -3,6 +3,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsDate,
   IsNumber,
+  IsOptional,
   IsPositive,
   IsString,
   Matches,
@@ -71,6 +72,7 @@ export class CreateEmpleadoDto {
     description: 'Cantidad de horas laborales que cumple el empleado al día',
   })
   @IsNumber()
+  @IsOptional()
   @IsPositive()
   hours_per_day!: number;
 
@@ -81,4 +83,8 @@ export class CreateEmpleadoDto {
   @IsString()
   @MinLength(1)
   work_schedule!: string;
+
+  @IsOptional()
+  @IsString()
+  imagen?: string;
 }

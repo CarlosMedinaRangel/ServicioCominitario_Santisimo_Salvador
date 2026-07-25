@@ -7,20 +7,43 @@ import {
   Param,
   Delete,
   Res,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { EmpleadosService } from './empleados.service';
 import { CreateEmpleadoDto } from './dto/create-empleado.dto';
 import { UpdateEmpleadoDto } from './dto/update-empleado.dto';
 import type { Response } from 'express';
-import { ApiOperation, ApiParam, ApiProduces, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiParam,
+  ApiProduces,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Empleado } from './entities/empleado.entity';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { imageFileFilter } from 'src/cloudinary/helpers/fileFilter';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 @ApiTags(`empleados`)
 @Controller('empleados')
 export class EmpleadosController {
-  constructor(private readonly empleadosService: EmpleadosService) {}
+  constructor(
+    private readonly empleadosService: EmpleadosService,
 
- @Post()
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
+
+  @Post()
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      fileFilter: imageFileFilter,
+      limits: { fileSize: 2 * 1024 * 1024 }, //mb
+    }),
+  )
   @ApiOperation({ summary: 'Registrar un nuevo empleado' })
   @ApiResponse({
     status: 201,
@@ -35,8 +58,18 @@ export class EmpleadosController {
     status: 403,
     description: 'Acceso denegado, Token inválido o ausente.',
   })
-  create(@Body() createEmpleadoDto: CreateEmpleadoDto) {
-    return this.empleadosService.create(createEmpleadoDto);
+  async create(
+    @Body() createEmpleadoDto: CreateEmpleadoDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      return;
+    }
+    const { secureUrl, publicId } = await this.cloudinaryService.uploadFile(
+      file,
+      'empleados',
+    );
+    return this.empleadosService.create(secureUrl, publicId, createEmpleadoDto);
   }
 
   @Get()
@@ -80,7 +113,8 @@ export class EmpleadosController {
   @ApiProduces('application/pdf')
   @ApiResponse({
     status: 200,
-    description: 'Archivo PDF de la constancia de trabajo generado correctamente.',
+    description:
+      'Archivo PDF de la constancia de trabajo generado correctamente.',
   })
   @ApiResponse({
     status: 404,
@@ -100,6 +134,13 @@ export class EmpleadosController {
   }
 
   @Patch(':id')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      fileFilter: imageFileFilter,
+      limits: { fileSize: 2 * 1024 * 1024 }, //mb
+    }),
+  )
   @ApiOperation({ summary: 'Actualizar los datos de un empleado' })
   @ApiParam({
     name: 'id',
@@ -114,15 +155,30 @@ export class EmpleadosController {
     status: 404,
     description: 'Empleado no encontrado.',
   })
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updateEmpleadoDto: UpdateEmpleadoDto,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.empleadosService.update(id, updateEmpleadoDto);
+    if (!file) {
+      return;
+    }
+    const { secureUrl, publicId } = await this.cloudinaryService.uploadFile(
+      file,
+      'empleados',
+    );
+    return this.empleadosService.update(
+      id,
+      secureUrl,
+      publicId,
+      updateEmpleadoDto,
+    );
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Eliminar un empleado (Soft Delete o Eliminación física)' })
+  @ApiOperation({
+    summary: 'Eliminar un empleado (Soft Delete o Eliminación física)',
+  })
   @ApiParam({
     name: 'id',
     description: 'ID del empleado a eliminar',

@@ -22,11 +22,12 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
   ) {}
-  async create(CreateUserDto: CreateUserDto) {
+  async create(secureUrl: string, CreateUserDto: CreateUserDto) {
     try {
       const { password, ...UserData } = CreateUserDto;
       const user = this.userRepository.create({
         ...UserData,
+        imagen: secureUrl,
         password: bcrypt.hashSync(password, 10),
       });
 

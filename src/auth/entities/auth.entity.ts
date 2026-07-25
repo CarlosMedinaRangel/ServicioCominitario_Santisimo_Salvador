@@ -18,6 +18,9 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  @Column('text', { unique: true, nullable: true })
+  imagen?: string;
+
   @ApiProperty({
     example: 'usuario@ejemplo.com',
     description: 'Correo electrónico único del usuario',

@@ -6,6 +6,8 @@ import {
   UseGuards,
   Req,
   SetMetadata,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto.user';
@@ -24,13 +26,27 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { imageFileFilter } from 'src/cloudinary/helpers/fileFilter';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   @Post('register')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      fileFilter: imageFileFilter,
+      limits: { fileSize: 2 * 1024 * 1024 }, //mb
+    }),
+  )
   @ApiOperation({ summary: 'Registrar un nuevo usuario en el sistema' })
   @ApiResponse({
     status: 201,
@@ -42,8 +58,18 @@ export class AuthController {
     description:
       'Bad Request. Error en las validaciones del DTO o el correo ya existe.',
   })
-  createUser(@Body() createUserDto: CreateUserDto) {
-    return this.authService.create(createUserDto);
+  async createUser(
+    @Body() createUserDto: CreateUserDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      return;
+    }
+    const { secureUrl, publicId } = await this.cloudinaryService.uploadFile(
+      file,
+      'usuarios',
+    );
+    return this.authService.create(secureUrl, createUserDto);
   }
 
   @Post('login')
