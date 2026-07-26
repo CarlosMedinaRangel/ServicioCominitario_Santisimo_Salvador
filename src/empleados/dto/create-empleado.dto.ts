@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsDate,
   IsNumber,
+  IsOptional,
   IsPositive,
   IsString,
   IsUUID,
@@ -50,6 +51,7 @@ export class CreateEmpleadoDto {
   })
   @IsNumber()
   @IsPositive()
+  @IsOptional()
   hours_per_day!: number;
 
   @ApiProperty({
@@ -59,4 +61,6 @@ export class CreateEmpleadoDto {
   @IsString()
   @MinLength(1)
   work_schedule!: string;
+
+
 }

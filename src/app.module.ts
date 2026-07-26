@@ -6,6 +6,7 @@ import { BasicReportsModule } from './basic-reports/basic-reports.module';
 import { PrinterModule } from './printer/printer.module';
 import { AuthModule } from './auth/auth.module';
 import { SeedModule } from './seed/seed.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { SeedModule } from './seed/seed.module';
 
     AuthModule,
     SeedModule,
+    CloudinaryModule,
   ],
 })
 export class AppModule {}

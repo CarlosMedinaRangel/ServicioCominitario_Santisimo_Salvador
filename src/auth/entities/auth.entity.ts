@@ -44,7 +44,8 @@ export class User {
 
   @ApiPropertyOptional({
     example: 'V12345678',
-    description: 'Cédula de identidad (única, común a todos los tipos de usuario)',
+    description:
+      'Cédula de identidad (única, común a todos los tipos de usuario)',
   })
   @Column('text', { unique: true, nullable: true })
   cedula?: string;
@@ -55,6 +56,12 @@ export class User {
   })
   @Column('text', { nullable: true })
   telefono?: string;
+
+  @Column('text', { unique: true, nullable: true })
+  imagen?: string;
+
+  @Column({ nullable: true })
+  publicId?: string;
 
   @ApiProperty({
     example: true,

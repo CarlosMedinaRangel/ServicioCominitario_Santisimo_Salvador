@@ -6,6 +6,9 @@ import {
   UseGuards,
   Req,
   SetMetadata,
+  UseInterceptors,
+  UploadedFile,
+  Patch,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto.user';
@@ -24,13 +27,28 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { imageFileFilter } from 'src/cloudinary/helpers/fileFilter';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { UpdateUserDto } from './dto/update-auth.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   @Post('register')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      fileFilter: imageFileFilter,
+      limits: { fileSize: 2 * 1024 * 1024 }, //mb
+    }),
+  )
   @ApiOperation({ summary: 'Registrar un nuevo usuario en el sistema' })
   @ApiResponse({
     status: 201,
@@ -42,8 +60,18 @@ export class AuthController {
     description:
       'Bad Request. Error en las validaciones del DTO o el correo ya existe.',
   })
-  createUser(@Body() createUserDto: CreateUserDto) {
-    return this.authService.create(createUserDto);
+  async createUser(
+    @Body() createUserDto: CreateUserDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      return;
+    }
+    const { secureUrl, publicId } = await this.cloudinaryService.uploadFile(
+      file,
+      'usuarios',
+    );
+    return this.authService.create(secureUrl, publicId, createUserDto);
   }
 
   @Post('login')
@@ -94,6 +122,37 @@ export class AuthController {
   })
   checkAuthStatus(@GetUser() user: User) {
     return this.authService.checkAuthStatus(user);
+  }
+
+  @Patch('update-profile')
+  @Auth()
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      fileFilter: imageFileFilter,
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Actualizar perfil del usuario autenticado' })
+  async updateProfile(
+    @GetUser() user: User,
+    @Body() updateUserDto: UpdateUserDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    let secureUrl: string | undefined;
+    let publicId: string | undefined;
+
+    if (file) {
+      const uploaded = await this.cloudinaryService.uploadFile(
+        file,
+        'usuarios',
+      );
+      secureUrl = uploaded.secureUrl;
+      publicId = uploaded.publicId;
+    }
+
+    return this.authService.update(user.id, secureUrl, publicId, updateUserDto);
   }
 
   @Get('private')

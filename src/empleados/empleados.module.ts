@@ -8,14 +8,16 @@ import { Group } from './entities/group.entity';
 import { Activity } from './entities/activity.entity';
 import { PrinterModule } from 'src/printer/printer.module';
 import { User } from 'src/auth/entities/auth.entity';
+import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 
 @Module({
   controllers: [EmpleadosController],
   providers: [EmpleadosService],
   imports: [
     TypeOrmModule.forFeature([Employee, Schedule, Group, Activity, User]),
+    CloudinaryModule,
     PrinterModule,
   ],
-  exports: [TypeOrmModule, EmpleadosModule, EmpleadosService],
+  exports: [TypeOrmModule, EmpleadosModule, EmpleadosService, CloudinaryModule],
 })
 export class EmpleadosModule {}
