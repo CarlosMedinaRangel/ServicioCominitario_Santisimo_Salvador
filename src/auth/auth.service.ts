@@ -14,6 +14,8 @@ import * as bcrypt from 'bcrypt';
 import { LoginUserDto } from './dto/Login-user.dto';
 import { JwtPayload } from './interfaces/jwt-payload';
 import { JwtService } from '@nestjs/jwt';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { UpdateUserDto } from './dto/update-auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -21,13 +23,17 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
+
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
-  async create(CreateUserDto: CreateUserDto) {
+  async create(secureUrl, publicId, CreateUserDto: CreateUserDto) {
     try {
       const { password, ...UserData } = CreateUserDto;
       const user = this.userRepository.create({
         ...UserData,
+        imagen: secureUrl ?? CreateUserDto.imagen, 
+        publicId: publicId ?? CreateUserDto.publicId,
         password: bcrypt.hashSync(password, 10),
       });
 
@@ -123,5 +129,41 @@ export class AuthService {
       ...user,
       token: this.getJWTToken({ id: user.id }),
     };
+  }
+
+  async update(
+    userId: string,
+    secureUrl: string | undefined,
+    publicId: string | undefined,
+    updateUserDto: UpdateUserDto,
+  ) {
+    const userActual = await this.userRepository.findOneBy({ id: userId });
+
+    if (!userActual) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    // Borra imagen anterior si viene una nueva
+    if (secureUrl && userActual.publicId) {
+      await this.cloudinaryService.deleteFile(userActual.publicId);
+    }
+
+    const user = await this.userRepository.preload({
+      id: userId,
+      ...updateUserDto,
+      ...(secureUrl ? { imagen: secureUrl, publicId } : {}),
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+
+    try {
+      const result = await this.userRepository.save(user);
+      const { password, ...userInfo } = result;
+      return userInfo;
+    } catch (error: any) {
+      this.handleDBErrors(error);
+    }
   }
 }

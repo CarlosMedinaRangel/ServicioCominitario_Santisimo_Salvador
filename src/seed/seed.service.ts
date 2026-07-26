@@ -53,10 +53,12 @@ export class SeedService {
 
     // ── Admin user (no employee record) ──
     const admin = this.userRepository.create({
-      email: this.configService.get('SEED_ADMIN_EMAIL') || 'admin@santisimo.edu',
+      email:
+        this.configService.get('SEED_ADMIN_EMAIL') || 'admin@santisimo.edu',
       password: bcrypt.hashSync(basePassword, 10),
       fullName:
-        this.configService.get('SEED_ADMIN_NAME') || 'Administrador del Sistema',
+        this.configService.get('SEED_ADMIN_NAME') ||
+        'Administrador del Sistema',
       cedula: 'V12345678',
       telefono: '04141234567',
       roles: ['admin'],
@@ -67,12 +69,15 @@ export class SeedService {
     // ── Employee 1: Dr. Elena Rodríguez ──
     const elenaUser = this.userRepository.create({
       email: 'elena.rodriguez@academia.edu',
-      password: bcrypt.hashSync('Elena123!', 10),
+      password: bcrypt.hashSync('Elena123!', 10), // Uso de bcrypt según fuentes [3]
       fullName: 'Dr. Elena Rodríguez',
       cedula: this.configService.get('SEED_EMPLOYEE_CEDULA') || 'V882924',
       telefono: '04145550189',
       roles: ['user'],
       isActive: true,
+      imagen:
+        'https://res.cloudinary.com/i7af6s9l/image/upload/v1785008440/usuarios/images_2_jo1ccl.jpg',
+      publicId: 'usuarios/images_2_jo1ccl.jpg',
     });
     await this.userRepository.save(elenaUser);
 
@@ -173,13 +178,16 @@ export class SeedService {
 
     // ── Employee 2: Prof. Carlos Mendoza ──
     const carlosUser = this.userRepository.create({
-      email: 'carlos.mendoza@academia.edu',
+      email: 'carlos.perez@academia.edu',
       password: bcrypt.hashSync('Carlos123!', 10),
-      fullName: 'Prof. Carlos Mendoza',
-      cedula: 'V003125',
-      telefono: '04125550189',
+      fullName: 'Ing. Carlos Pérez',
+      cedula: 'V1234567',
+      telefono: '04125550001',
       roles: ['user'],
       isActive: true,
+      imagen:
+        'https://res.cloudinary.com/i7af6s9l/image/upload/v1785008103/usuarios/1561815164912_oxjbnh.jpg',
+      publicId: 'usuarios/1561815164912_oxjbnh',
     });
     await this.userRepository.save(carlosUser);
 
@@ -263,6 +271,9 @@ export class SeedService {
       telefono: '04165550189',
       roles: ['user'],
       isActive: true,
+      imagen:
+        'https://res.cloudinary.com/i7af6s9l/image/upload/v1785008441/usuarios/1775867008473_ekou6u.jpg',
+      publicId: 'usuarios/1775867008473_ekou6u.jpg',
     });
     await this.userRepository.save(anaUser);
 
@@ -365,15 +376,10 @@ export class SeedService {
       usersCount: 1 + 3 + bulkUsersCount,
       employeesCount: 3 + bulkEmployeesCount,
       schedulesCount:
-        elenaSchedules.length +
-        carlosSchedules.length +
-        anaSchedules.length,
-      groupsCount:
-        elenaGroups.length + carlosGroups.length + anaGroups.length,
+        elenaSchedules.length + carlosSchedules.length + anaSchedules.length,
+      groupsCount: elenaGroups.length + carlosGroups.length + anaGroups.length,
       activitiesCount:
-        elenaActivities.length +
-        carlosActivities.length +
-        anaActivities.length,
+        elenaActivities.length + carlosActivities.length + anaActivities.length,
     };
   }
 }

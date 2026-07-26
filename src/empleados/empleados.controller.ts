@@ -32,6 +32,8 @@ import {
 import { Employee } from './entities/employee.entity';
 import { Auth } from 'src/auth/Decorators/auth.decorator';
 
+import 'multer';
+
 @ApiTags('empleados')
 @Controller('empleados')
 export class EmpleadosController {
@@ -72,8 +74,7 @@ export class EmpleadosController {
         file: { type: 'string', format: 'binary' },
         mapping: {
           type: 'string',
-          description:
-            'JSON con el mapeo: {"campo": "indice_columna", ...}',
+          description: 'JSON con el mapeo: {"campo": "indice_columna", ...}',
         },
         sheetName: {
           type: 'string',
@@ -208,7 +209,9 @@ export class EmpleadosController {
   @Post(':id/activities/seed')
   @Auth()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Generar actividades de prueba para un empleado en un mes' })
+  @ApiOperation({
+    summary: 'Generar actividades de prueba para un empleado en un mes',
+  })
   @ApiQuery({
     name: 'month',
     required: false,
@@ -219,16 +222,16 @@ export class EmpleadosController {
     status: 201,
     description: 'Actividades de prueba generadas.',
   })
-  seedActivities(
-    @Param('id') id: string,
-    @Query('month') month?: string,
-  ) {
+  seedActivities(@Param('id') id: string, @Query('month') month?: string) {
     const targetMonth = month || new Date().toISOString().slice(0, 7);
     return this.empleadosService.seedActivities(id, targetMonth);
   }
 
   @Get('Constancia-Empleado/:id')
-  @ApiOperation({ summary: 'Descargar constancia de trabajo en formato PDF. Opcional: ?month=YYYY-MM para incluir actividades del mes.' })
+  @ApiOperation({
+    summary:
+      'Descargar constancia de trabajo en formato PDF. Opcional: ?month=YYYY-MM para incluir actividades del mes.',
+  })
   @ApiParam({
     name: 'id',
     description: 'UUID (userId) o cédula del empleado',
@@ -284,7 +287,9 @@ export class EmpleadosController {
     });
 
     response.setHeader('Content-Type', 'application/pdf');
-    pdfDoc.info.Title = month ? `constancia-${month}.pdf` : 'employment-letter.pdf';
+    pdfDoc.info.Title = month
+      ? `constancia-${month}.pdf`
+      : 'employment-letter.pdf';
     pdfDoc.pipe(response);
     pdfDoc.end();
   }

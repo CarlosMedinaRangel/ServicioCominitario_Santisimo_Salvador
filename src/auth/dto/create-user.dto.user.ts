@@ -58,4 +58,11 @@ export class CreateUserDto {
   @IsString()
   @MinLength(1)
   telefono?: string;
+  @IsOptional()
+  @IsString()
+  imagen?: string;
+
+  @IsOptional()
+  @IsString()
+  publicId?: string;
 }
