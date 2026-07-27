@@ -32,7 +32,7 @@ export class AuthService {
       const { password, ...UserData } = CreateUserDto;
       const user = this.userRepository.create({
         ...UserData,
-        imagen: secureUrl ?? CreateUserDto.imagen, 
+        imagen: secureUrl ?? CreateUserDto.imagen,
         publicId: publicId ?? CreateUserDto.publicId,
         password: bcrypt.hashSync(password, 10),
       });
@@ -106,6 +106,7 @@ export class AuthService {
         telefono: user.telefono,
         isActive: user.isActive,
         roles: user.roles,
+        imagen: user.imagen,
       },
       employee: user.employee || null,
     };
