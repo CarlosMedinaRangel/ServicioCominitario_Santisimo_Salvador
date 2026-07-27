@@ -63,6 +63,8 @@ export class SeedService {
       telefono: '04141234567',
       roles: ['admin'],
       isActive: true,
+      imagen: '',
+      publicId: '',
     });
     await this.userRepository.save(admin);
 
