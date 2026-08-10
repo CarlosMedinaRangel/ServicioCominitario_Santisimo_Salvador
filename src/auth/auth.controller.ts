@@ -5,11 +5,13 @@ import {
   Get,
   UseGuards,
   Req,
+  Res,
   SetMetadata,
   UseInterceptors,
   UploadedFile,
   Patch,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto.user';
 import { LoginUserDto } from './dto/Login-user.dto';
@@ -32,6 +34,29 @@ import { memoryStorage } from 'multer';
 import { imageFileFilter } from 'src/cloudinary/helpers/fileFilter';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { UpdateUserDto } from './dto/update-auth.dto';
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 💡 COOKIE CONFIGURATION & DEPLOYMENT NOTES:
+// - Development: sameSite: 'strict', secure: false (works on http://localhost)
+// - Production (Same Domain / Subdomains like app.school.com & api.school.com):
+//   sameSite: 'lax', secure: true (HTTPS provided free by Render/Railway/Vercel)
+// - Production (Different Domains like app.vercel.app & api.render.com):
+//   sameSite: 'none', secure: true (Requires HTTPS + cors origin matching)
+// ════════════════════════════════════════════════════════════════════════════════
+const isProduction = process.env.NODE_ENV === 'production';
+
+// ── __Host- prefix requires HTTPS (secure: true) and Path=/ ──
+// In production (HTTPS), prefix with __Host- for maximum browser enforcement.
+// In local dev (HTTP), fallback to auth_token without prefix.
+export const COOKIE_NAME = isProduction ? '__Host-auth_token' : 'auth_token';
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: isProduction ? ('none' as const) : ('strict' as const),
+  secure: isProduction, // Free HTTPS certificates on Render/Railway/Vercel
+  maxAge: 1000 * 60 * 60 * 24, // 24 hours
+  path: '/',
+};
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -62,16 +87,21 @@ export class AuthController {
   })
   async createUser(
     @Body() createUserDto: CreateUserDto,
+    @Res({ passthrough: true }) response: Response,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    if (!file) {
-      return;
+    let secureUrl: string | undefined;
+    let publicId: string | undefined;
+    if (file) {
+      const uploaded = await this.cloudinaryService.uploadFile(file, 'usuarios');
+      secureUrl = uploaded.secureUrl;
+      publicId = uploaded.publicId;
     }
-    const { secureUrl, publicId } = await this.cloudinaryService.uploadFile(
-      file,
-      'usuarios',
-    );
-    return this.authService.create(secureUrl, publicId, createUserDto);
+    const result = await this.authService.create(secureUrl, publicId, createUserDto);
+    if (result && result.token) {
+      response.cookie(COOKIE_NAME, result.token, COOKIE_OPTIONS);
+    }
+    return result;
   }
 
   @Post('login')
@@ -84,8 +114,26 @@ export class AuthController {
     status: 401,
     description: 'Unauthorized. Credenciales incorrectas.',
   })
-  LoginUser(@Body() LoginUserDto: LoginUserDto) {
-    return this.authService.login(LoginUserDto);
+  async LoginUser(
+    @Body() LoginUserDto: LoginUserDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.login(LoginUserDto);
+    if (result && result.token) {
+      response.cookie(COOKIE_NAME, result.token, COOKIE_OPTIONS);
+    }
+    return result;
+  }
+
+  @Post('logout')
+  @ApiOperation({ summary: 'Cerrar sesión y limpiar cookie httpOnly' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sesión cerrada exitosamente.',
+  })
+  logout(@Res({ passthrough: true }) response: Response) {
+    response.clearCookie(COOKIE_NAME, { path: '/' });
+    return { ok: true, message: 'Sesión cerrada exitosamente' };
   }
 
   @Get('me/employee')
