@@ -33,5 +33,12 @@ export class LoginUserDto {
   })
   password!: string;
 
-
+  @ApiProperty({
+    example: '0.xxxxxxxxxxx.xxxxxxxxx',
+    description: 'Token de verificación de Cloudflare Turnstile anti-bot',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  turnstileToken?: string;
 }

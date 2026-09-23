@@ -80,6 +80,20 @@ export class User {
   @Column('text', { array: true, default: ['user'] })
   roles!: string[];
 
+  @ApiProperty({
+    example: 0,
+    description: 'Contador de intentos fallidos de inicio de sesión',
+    default: 0,
+  })
+  @Column({ type: 'int', default: 0 })
+  failedLoginAttempts!: number;
+
+  @ApiPropertyOptional({
+    description: 'Fecha y hora hasta la cual la cuenta permanece bloqueada por seguridad',
+  })
+  @Column({ type: 'timestamp', nullable: true })
+  lockedUntil?: Date | null;
+
   @OneToOne(() => Employee, (employee) => employee.user)
   employee?: Employee;
 

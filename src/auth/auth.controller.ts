@@ -11,7 +11,7 @@ import {
   UploadedFile,
   Patch,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto.user';
 import { LoginUserDto } from './dto/Login-user.dto';
@@ -58,6 +58,8 @@ const COOKIE_OPTIONS = {
   path: '/',
 };
 
+import { Throttle } from '@nestjs/throttler';
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
@@ -67,6 +69,7 @@ export class AuthController {
   ) {}
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -98,13 +101,11 @@ export class AuthController {
       publicId = uploaded.publicId;
     }
     const result = await this.authService.create(secureUrl, publicId, createUserDto);
-    if (result && result.token) {
-      response.cookie(COOKIE_NAME, result.token, COOKIE_OPTIONS);
-    }
     return result;
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Iniciar sesión y obtener token de acceso' })
   @ApiResponse({
     status: 200,
@@ -114,11 +115,21 @@ export class AuthController {
     status: 401,
     description: 'Unauthorized. Credenciales incorrectas.',
   })
+  @ApiResponse({
+    status: 423,
+    description: 'Locked. Cuenta temporalmente bloqueada por 5 intentos fallidos.',
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests. Límite de intentos por IP excedido.',
+  })
   async LoginUser(
     @Body() LoginUserDto: LoginUserDto,
     @Res({ passthrough: true }) response: Response,
+    @Req() req: any,
   ) {
-    const result = await this.authService.login(LoginUserDto);
+    const clientIp = req.ip || req.connection?.remoteAddress;
+    const result = await this.authService.login(LoginUserDto, clientIp);
     if (result && result.token) {
       response.cookie(COOKIE_NAME, result.token, COOKIE_OPTIONS);
     }

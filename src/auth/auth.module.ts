@@ -8,10 +8,11 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './strategies/jew.strategy';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { TurnstileService } from './services/turnstile.service';
 
 @Module({
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, TurnstileService],
   imports: [
     ConfigModule,
     CloudinaryModule,

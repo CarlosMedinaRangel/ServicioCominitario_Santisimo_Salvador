@@ -31,6 +31,7 @@ import {
 } from '@nestjs/swagger';
 import { Employee } from './entities/employee.entity';
 import { Auth } from 'src/auth/Decorators/auth.decorator';
+import { ValidRoles } from 'src/auth/interfaces';
 
 import 'multer';
 
@@ -40,7 +41,7 @@ export class EmpleadosController {
   constructor(private readonly empleadosService: EmpleadosService) {}
 
   @Post()
-  @Auth()
+  @Auth(ValidRoles.admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Registrar un nuevo empleado' })
   @ApiResponse({
@@ -61,7 +62,7 @@ export class EmpleadosController {
   }
 
   @Post('upload')
-  @Auth()
+  @Auth(ValidRoles.admin)
   @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Cargar archivo Excel/CSV con datos de empleados' })
@@ -136,7 +137,7 @@ export class EmpleadosController {
   }
 
   @Get()
-  @Auth()
+  @Auth(ValidRoles.admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener la lista de todos los empleados' })
   @ApiResponse({
@@ -207,7 +208,7 @@ export class EmpleadosController {
   }
 
   @Post(':id/activities/seed')
-  @Auth()
+  @Auth(ValidRoles.admin)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Generar actividades de prueba para un empleado en un mes',
@@ -295,7 +296,7 @@ export class EmpleadosController {
   }
 
   @Patch(':id')
-  @Auth()
+  @Auth(ValidRoles.admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Actualizar los datos de un empleado' })
   @ApiParam({
@@ -319,7 +320,7 @@ export class EmpleadosController {
   }
 
   @Delete(':id')
-  @Auth()
+  @Auth(ValidRoles.admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Eliminar un empleado' })
   @ApiParam({
