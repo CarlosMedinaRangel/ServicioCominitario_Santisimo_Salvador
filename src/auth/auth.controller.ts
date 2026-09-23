@@ -11,7 +11,7 @@ import {
   UploadedFile,
   Patch,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto.user';
 import { LoginUserDto } from './dto/Login-user.dto';
