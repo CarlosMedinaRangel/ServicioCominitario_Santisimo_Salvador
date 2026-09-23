@@ -7,12 +7,24 @@ import { PrinterModule } from './printer/printer.module';
 import { AuthModule } from './auth/auth.module';
 import { SeedModule } from './seed/seed.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { CryptoModule } from './crypto/crypto.module';
+import { DocumentsModule } from './documents/documents.module';
+
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
+      isGlobal: true,
       expandVariables: true,
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 30, // Global baseline: 30 requests per minute
+      },
+    ]),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST,
@@ -37,6 +49,14 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
     AuthModule,
     SeedModule,
     CloudinaryModule,
+    CryptoModule,
+    DocumentsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

@@ -9,21 +9,22 @@ const styles: StyleDictionary = {
     fontSize: 22,
     bold: true,
     alignment: 'center',
-    margin: [0, 60, 0, 50], //IZQUIERDA ARRIBA DERECHA  ABAJO
+    margin: [0, 40, 0, 35],
   },
   body: {
-    alignment: `justify`,
-    margin: [0, 0, 0, 70],
+    alignment: 'justify',
+    margin: [0, 0, 0, 40],
+    lineHeight: 1.3,
   },
   signature: {
-    fontSize: 14,
+    fontSize: 12,
     bold: true,
   },
   footer: {
-    fontSize: 10,
+    fontSize: 9,
     italics: true,
     alignment: 'center',
-    margin: [0, 0, 0, 20],
+    margin: [0, 0, 0, 15],
   },
 };
 
@@ -37,6 +38,8 @@ interface ReportProps {
   employeeHours: number;
   employeeWorkSchedule: string;
   employerCompany: string;
+  qrDataUrl?: string;
+  verificationId?: string;
 }
 
 export const employementLetterReportByID = (
@@ -52,10 +55,13 @@ export const employementLetterReportByID = (
     employerCompany,
     employerName,
     employerPosition,
+    qrDataUrl,
+    verificationId,
   } = Props;
+
   const docDefinition: TDocumentDefinitions = {
     styles: styles,
-    pageMargins: [40, 60, 40, 60],
+    pageMargins: [40, 50, 40, 50],
 
     header: headerSection({ showLogo: true, ShowDate: true }),
 
@@ -65,25 +71,78 @@ export const employementLetterReportByID = (
         style: 'header',
       },
       {
-        text: `Yo, ${employerName}, en mi calidad de ${employerPosition} de ${employerCompany},por medio de la presente certifico que ${employeeName} ha sido empleado en nuestra empresa desde el ${employeeStartDate}.\n
-                Durante su empleo, el Sr./Sra. ${employeeName}  de cedula de identidad ${employeeCedula} ha desempeñado el cargo de ${employeePosition}, demostrando responsabilidad, compromiso y habilidades profesionales en sus
-                labores.\n
-                La jornada laboral del Sr./ Sra. ${employeeName} es de ${employeeHours} horas semanales, con un horario de ${employeeWorkSchedule}, cumpliendo con las políticas y procedimientos establecidos por la empresa.\m
-                Esta constancia se expide a solicitud del interesado para los fines que considere conveniente.\n`,
-
-        style: `body`,
+        text: [
+          `Yo, `,
+          { text: employerName, bold: true },
+          `, en mi calidad de ${employerPosition} de ${employerCompany}, por medio de la presente certifico que `,
+          { text: employeeName, bold: true },
+          `, titular de la cédula de identidad Nº `,
+          { text: employeeCedula, bold: true },
+          `, labora en nuestra institución desde el `,
+          { text: DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate)), bold: true },
+          `, desempeñando el cargo de `,
+          { text: employeePosition, bold: true },
+          `.\n\n`,
+          `La jornada laboral del Sr./Sra. ${employeeName} es de ${employeeHours} horas semanales, con un horario de ${employeeWorkSchedule}, cumpliendo a cabalidad con las políticas y procedimientos establecidos por la institución.\n\n`,
+          `Esta constancia se expide a solicitud de la parte interesada para los fines que considere convenientes.`,
+        ],
+        style: 'body',
       },
-      { text: `Atentamente`, style: 'signature' },
-
-      { text: `${employerName}`, style: 'signature' },
-      { text: `${employerPosition}`, style: 'signature' },
-      { text: `${employerCompany}`, style: 'signature' },
-      { text: DateFormatter.getDDMMMMYYYY(new Date()), style: 'signature' },
+      {
+        columns: [
+          {
+            width: '*',
+            stack: [
+              { text: 'Atentamente,', style: 'signature', margin: [0, 0, 0, 15] },
+              { text: employerName, style: 'signature' },
+              { text: employerPosition, fontSize: 10, italics: true },
+              { text: employerCompany, fontSize: 10 },
+              { text: DateFormatter.getDDMMMMYYYY(new Date()), fontSize: 9, color: '#64748b', margin: [0, 4, 0, 0] },
+            ],
+          },
+          qrDataUrl
+            ? {
+                width: 140,
+                alignment: 'center',
+                stack: [
+                  {
+                    image: qrDataUrl,
+                    width: 80,
+                    height: 80,
+                    alignment: 'center',
+                  },
+                  {
+                    text: 'SELLO DIGITAL OFICIAL',
+                    fontSize: 7,
+                    bold: true,
+                    alignment: 'center',
+                    margin: [0, 4, 0, 1],
+                    color: '#1e293b',
+                  },
+                  {
+                    text: verificationId ? `ID: ${verificationId.slice(0, 8)}...` : 'Verificación Criptográfica',
+                    fontSize: 6,
+                    alignment: 'center',
+                    color: '#64748b',
+                  },
+                  {
+                    text: 'Escanear para verificar autenticidad',
+                    fontSize: 6,
+                    italics: true,
+                    alignment: 'center',
+                    color: '#475569',
+                  },
+                ],
+              }
+            : { width: 0, text: '' },
+        ],
+        margin: [0, 10, 0, 0],
+      },
     ],
 
     footer: {
-      text: 'Este documento es una constancia de empleo y no representa un compromiso laboral.',
-      style: `footer`,
+      text: 'Este documento cuenta con un sello digital de autenticidad criptográfica verificable en el sistema de Santísimo Salvador.',
+      style: 'footer',
     },
   };
 

@@ -63,10 +63,15 @@ export interface Style {
   characterSpacing?: number;
   preserveLeadingSpaces?: boolean;
   style?: string | string[];
+  width?: '*' | 'auto' | number | string;
 }
 
 export interface ContentText extends Style {
   text: string | Content | Content[];
+}
+
+export interface ContentStack extends Style {
+  stack: Content[];
 }
 
 export interface ContentImage extends Style {
@@ -155,6 +160,7 @@ export interface ContentSVG extends Style {
 export type Content =
   | string
   | ContentText
+  | ContentStack
   | ContentImage
   | ContentColumns
   | ContentTable

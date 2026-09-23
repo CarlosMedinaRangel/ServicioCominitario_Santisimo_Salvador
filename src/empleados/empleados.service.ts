@@ -18,6 +18,8 @@ import { IErrorsTypeORM } from 'src/interfaces/error.response';
 import { PrinterService } from 'src/printer/printer.service';
 import { employementLetterReportByID } from 'src/reports/employementLetterByID.report';
 import { constanciaMensualReport } from 'src/reports/constanciaMensual.report';
+import { DocumentsService } from 'src/documents/documents.service';
+import { DocumentType, RecipientType } from 'src/documents/entities/document-verification.entity';
 import * as bcrypt from 'bcrypt';
 import * as XLSX from 'xlsx';
 
@@ -50,6 +52,7 @@ export class EmpleadosService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly PrinterService: PrinterService,
+    private readonly documentsService: DocumentsService,
   ) {}
 
   async create(createEmpleadoDto: CreateEmpleadoDto) {
@@ -146,6 +149,25 @@ export class EmpleadosService {
     const employerPosition = options?.employerPosition || 'Director';
     const employerCompany = options?.employerCompany || 'Santisimo Salvador';
 
+    // Generate cryptographic QR verification seal and save record
+    const { record: docRecord, qrDataUrl } =
+      await this.documentsService.issueDocument({
+        documentType: DocumentType.CONSTANCIA_TRABAJO,
+        recipientType: RecipientType.EMPLOYEE,
+        recipientId: employee.userId,
+        recipientIdentifier: user.cedula || 'N/A',
+        recipientName: user.fullName,
+        issuedByName: `${employerName} (${employerPosition})`,
+        metadata: {
+          empresa: employerCompany,
+          cargo: employee.position,
+          horas: employee.hours_per_day,
+          horario: employee.work_schedule,
+          fechaInicio: employee.start_date,
+          mes: options?.month || null,
+        },
+      });
+
     if (options?.month) {
       const [yearStr, monthStr] = options.month.split('-');
       const year = parseInt(yearStr, 10);
@@ -173,6 +195,8 @@ export class EmpleadosService {
         employeeHours: employee.hours_per_day,
         employeeWorkSchedule: employee.work_schedule,
         month: `${monthStr}-${yearStr}`,
+        qrDataUrl,
+        verificationId: docRecord.id,
         activities: activities.map((a) => ({
           tipo: a.tipo,
           descripcion: a.descripcion,
@@ -194,6 +218,8 @@ export class EmpleadosService {
       employeeStartDate: employee.start_date,
       employeeHours: employee.hours_per_day,
       employeeWorkSchedule: employee.work_schedule,
+      qrDataUrl,
+      verificationId: docRecord.id,
     });
 
     return this.PrinterService.createPdf(docDefinition);

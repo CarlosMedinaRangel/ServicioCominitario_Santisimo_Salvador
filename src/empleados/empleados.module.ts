@@ -9,6 +9,7 @@ import { Activity } from './entities/activity.entity';
 import { PrinterModule } from 'src/printer/printer.module';
 import { User } from 'src/auth/entities/auth.entity';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { DocumentsModule } from 'src/documents/documents.module';
 
 @Module({
   controllers: [EmpleadosController],
@@ -17,6 +18,7 @@ import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
     TypeOrmModule.forFeature([Employee, Schedule, Group, Activity, User]),
     CloudinaryModule,
     PrinterModule,
+    DocumentsModule,
   ],
   exports: [TypeOrmModule, EmpleadosModule, EmpleadosService, CloudinaryModule],
 })
