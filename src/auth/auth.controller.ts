@@ -93,14 +93,18 @@ export class AuthController {
     let secureUrl: string | undefined;
     let publicId: string | undefined;
     if (file) {
-      const uploaded = await this.cloudinaryService.uploadFile(file, 'usuarios');
+      const uploaded = await this.cloudinaryService.uploadFile(
+        file,
+        'usuarios',
+      );
       secureUrl = uploaded.secureUrl;
       publicId = uploaded.publicId;
     }
-    const result = await this.authService.create(secureUrl, publicId, createUserDto);
-    if (result && result.token) {
-      response.cookie(COOKIE_NAME, result.token, COOKIE_OPTIONS);
-    }
+    const result = await this.authService.create(
+      secureUrl,
+      publicId,
+      createUserDto,
+    );
     return result;
   }
 

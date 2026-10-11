@@ -42,7 +42,6 @@ export class AuthService {
 
       return {
         ...userinfo,
-        token: this.getJWTToken({ id: user.id }),
       };
     } catch (error: any) {
       this.handleDBErrors(error);
