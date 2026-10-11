@@ -8,7 +8,7 @@ import {
 import { CreateEmpleadoDto } from './dto/create-empleado.dto';
 import { UpdateEmpleadoDto } from './dto/update-empleado.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, DataSource } from 'typeorm';
 import { Employee } from './entities/employee.entity';
 import { Schedule } from './entities/schedule.entity';
 import { Group } from './entities/group.entity';
@@ -50,19 +50,23 @@ export class EmpleadosService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly PrinterService: PrinterService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createEmpleadoDto: CreateEmpleadoDto) {
-    try {
-      const user = await this.userRepository.findOneBy({
-        id: createEmpleadoDto.userId,
-      });
-      if (!user) {
-        throw new BadRequestException(
-          `No existe un usuario con id ${createEmpleadoDto.userId}`,
-        );
-      }
-      const employee = this.employeeRepository.create({
+    const user = await this.userRepository.findOneBy({
+      id: createEmpleadoDto.userId,
+    });
+
+    if (!user) {
+      throw new BadRequestException(
+        `No existe un usuario con id ${createEmpleadoDto.userId}`,
+      );
+    }
+
+    return await this.dataSource.transaction(async (manager) => {
+      // 1. Crear el empleado
+      const employee = manager.create(Employee, {
         userId: user.id,
         position: createEmpleadoDto.position,
         start_date: createEmpleadoDto.start_date as any,
@@ -70,14 +74,42 @@ export class EmpleadosService {
         hours_per_day: createEmpleadoDto.hours_per_day,
         work_schedule: createEmpleadoDto.work_schedule,
       });
-      await this.employeeRepository.save(employee);
-      return this.employeeRepository.findOne({
+      await manager.save(employee);
+
+      if (createEmpleadoDto.schedules?.length) {
+        for (const scheduleDto of createEmpleadoDto.schedules) {
+          const { groups, ...scheduleData } = scheduleDto;
+
+          const schedule = manager.create(Schedule, {
+            ...scheduleData,
+            employeeId: employee.userId,
+          });
+          await manager.save(schedule);
+
+          if (groups?.length) {
+            const newGroups = manager.create(
+              Group,
+              groups.map((g) => ({
+                ...g,
+                employeeId: employee.userId,
+                scheduleId: schedule.id,
+              })),
+            );
+            await manager.save(newGroups);
+          }
+        }
+      }
+
+      return manager.findOne(Employee, {
         where: { userId: employee.userId },
-        relations: { user: true },
+        relations: {
+          user: true,
+          schedules: {
+            groups: true,
+          },
+        },
       });
-    } catch (error: any) {
-      this.handleExceptions(error);
-    }
+    });
   }
 
   async findAll() {
@@ -88,7 +120,8 @@ export class EmpleadosService {
     let employee: Employee | null = null;
 
     // Try UUID format (userId)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (uuidRegex.test(id)) {
       employee = await this.employeeRepository.findOne({
         where: { userId: id },
@@ -102,7 +135,9 @@ export class EmpleadosService {
       if (!cedulaLimpia.startsWith('V')) {
         cedulaLimpia = 'V' + cedulaLimpia;
       }
-      const user = await this.userRepository.findOneBy({ cedula: cedulaLimpia });
+      const user = await this.userRepository.findOneBy({
+        cedula: cedulaLimpia,
+      });
       if (user) {
         employee = await this.employeeRepository.findOne({
           where: { userId: user.id },
@@ -121,7 +156,7 @@ export class EmpleadosService {
   async findSchedules(employeeId: string) {
     return this.scheduleRepository.find({
       where: { employeeId },
-      order: { dia: 'ASC', horaInicio: 'ASC' },
+      order: { dias: 'ASC', horaInicio: 'ASC' },
     });
   }
 
@@ -138,7 +173,15 @@ export class EmpleadosService {
     });
   }
 
-  async ConstanciaEmpleadoByID(id: string, options?: { month?: string; employerName?: string; employerPosition?: string; employerCompany?: string }) {
+  async ConstanciaEmpleadoByID(
+    id: string,
+    options?: {
+      month?: string;
+      employerName?: string;
+      employerPosition?: string;
+      employerCompany?: string;
+    },
+  ) {
     const employee = await this.findOne(id);
     const user = employee.user;
 
@@ -208,9 +251,7 @@ export class EmpleadosService {
     });
 
     if (!updated) {
-      throw new NotFoundException(
-        `El empleado con el id ${id} no se encontró`,
-      );
+      throw new NotFoundException(`El empleado con el id ${id} no se encontró`);
     }
 
     try {
@@ -239,14 +280,21 @@ export class EmpleadosService {
     file: Express.Multer.File,
     mapping: Record<string, number>,
   ): Promise<UploadResult> {
-    const workbook = XLSX.read(file.buffer, { type: 'buffer', cellDates: true });
+    const workbook = XLSX.read(file.buffer, {
+      type: 'buffer',
+      cellDates: true,
+    });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+    const jsonData = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+    }) as unknown[][];
 
     const rows = jsonData
       .slice(1)
-      .filter((r) => r.some((cell) => cell !== undefined && cell !== null && cell !== ''));
+      .filter((r) =>
+        r.some((cell) => cell !== undefined && cell !== null && cell !== ''),
+      );
 
     let created = 0;
     let updated = 0;
@@ -276,7 +324,9 @@ export class EmpleadosService {
           });
         }
         if (!user && data.cedula) {
-          let cedulaLookup = String(data.cedula).replace(/\./g, '').toUpperCase();
+          let cedulaLookup = String(data.cedula)
+            .replace(/\./g, '')
+            .toUpperCase();
           if (!cedulaLookup.startsWith('V')) cedulaLookup = 'V' + cedulaLookup;
           user = await this.userRepository.findOneBy({ cedula: cedulaLookup });
         }
@@ -285,7 +335,8 @@ export class EmpleadosService {
           // Update existing user
           const userUpdates: Partial<User> = {};
           if (data.fullName) userUpdates.fullName = String(data.fullName);
-          if (data.email) userUpdates.email = String(data.email).toLowerCase().trim();
+          if (data.email)
+            userUpdates.email = String(data.email).toLowerCase().trim();
           if (data.cedula) {
             let c = String(data.cedula).replace(/\./g, '').toUpperCase();
             if (!c.startsWith('V')) c = 'V' + c;
@@ -300,7 +351,9 @@ export class EmpleadosService {
             ? String(data.password)
             : `${data.cedula || 'Default'}123!`;
           user = this.userRepository.create({
-            email: String(data.email || `${data.cedula}@santisimo.edu`).toLowerCase().trim(),
+            email: String(data.email || `${data.cedula}@santisimo.edu`)
+              .toLowerCase()
+              .trim(),
             password: bcrypt.hashSync(password, 10),
             fullName: String(data.fullName || data.name || 'Sin Nombre'),
             roles: ['user'],
@@ -401,17 +454,33 @@ export class EmpleadosService {
     const mes = parseInt(monthStr, 10);
 
     const activityTypes = [
-      'Clase Impartida', 'Reunión', 'Corrección de Evaluaciones',
-      'Planificación', 'Laboratorio', 'Tutoría',
+      'Clase Impartida',
+      'Reunión',
+      'Corrección de Evaluaciones',
+      'Planificación',
+      'Laboratorio',
+      'Tutoría',
     ];
     const descriptions = [
-      'Matemáticas Básicas', 'Biología Molecular', 'Historia Universal',
-      'Lengua y Literatura', 'Física General', 'Química Orgánica',
-      'Inglés Avanzado', 'Educación Física', 'Arte y Cultura',
+      'Matemáticas Básicas',
+      'Biología Molecular',
+      'Historia Universal',
+      'Lengua y Literatura',
+      'Física General',
+      'Química Orgánica',
+      'Inglés Avanzado',
+      'Educación Física',
+      'Arte y Cultura',
     ];
     const details = [
-      'Grupo A', 'Grupo B', 'Grupo C', 'Salón 101', 'Salón 203',
-      'Laboratorio 1', 'Aula Virtual', 'Biblioteca',
+      'Grupo A',
+      'Grupo B',
+      'Grupo C',
+      'Salón 101',
+      'Salón 203',
+      'Laboratorio 1',
+      'Aula Virtual',
+      'Biblioteca',
     ];
 
     const activities: Activity[] = [];
@@ -422,8 +491,10 @@ export class EmpleadosService {
       const hour = 7 + Math.floor(Math.random() * 10);
       const timestamp = new Date(year, mes - 1, day, hour, 0, 0);
 
-      const tipo = activityTypes[Math.floor(Math.random() * activityTypes.length)];
-      const descripcion = descriptions[Math.floor(Math.random() * descriptions.length)];
+      const tipo =
+        activityTypes[Math.floor(Math.random() * activityTypes.length)];
+      const descripcion =
+        descriptions[Math.floor(Math.random() * descriptions.length)];
       const detalle = details[Math.floor(Math.random() * details.length)];
 
       const activity = this.activityRepository.create({
