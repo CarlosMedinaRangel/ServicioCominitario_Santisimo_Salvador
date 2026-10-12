@@ -8,7 +8,7 @@ import {
 import { CreateEmpleadoDto } from './dto/create-empleado.dto';
 import { UpdateEmpleadoDto } from './dto/update-empleado.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, DataSource } from 'typeorm';
+import { Repository, Between, DataSource, In } from 'typeorm';
 import { Employee } from './entities/employee.entity';
 import { Schedule } from './entities/schedule.entity';
 import { Group } from './entities/group.entity';
@@ -125,7 +125,12 @@ export class EmpleadosService {
     if (uuidRegex.test(id)) {
       employee = await this.employeeRepository.findOne({
         where: { userId: id },
-        relations: { user: true },
+        relations: {
+          user: true,
+          schedules: {
+            groups: true,
+          },
+        },
       });
     }
 
@@ -141,7 +146,12 @@ export class EmpleadosService {
       if (user) {
         employee = await this.employeeRepository.findOne({
           where: { userId: user.id },
-          relations: { user: true },
+          relations: {
+            user: true,
+            schedules: {
+              groups: true,
+            },
+          },
         });
       }
     }
@@ -245,24 +255,127 @@ export class EmpleadosService {
   async update(id: string, updateEmpleadoDto: UpdateEmpleadoDto) {
     const employee = await this.findOne(id);
 
-    const updated = await this.employeeRepository.preload({
-      userId: employee.userId,
-      ...updateEmpleadoDto,
-    });
+    return await this.dataSource.transaction(async (manager) => {
+      await manager.update(
+        Employee,
+        { userId: employee.userId },
+        {
+          ...(updateEmpleadoDto.position && {
+            position: updateEmpleadoDto.position,
+          }),
+          ...(updateEmpleadoDto.start_date && {
+            start_date: updateEmpleadoDto.start_date as any,
+          }),
+          ...(updateEmpleadoDto.work_time && {
+            work_time: updateEmpleadoDto.work_time,
+          }),
+          ...(updateEmpleadoDto.hours_per_day !== undefined && {
+            hours_per_day: updateEmpleadoDto.hours_per_day,
+          }),
+          ...(updateEmpleadoDto.work_schedule && {
+            work_schedule: updateEmpleadoDto.work_schedule,
+          }),
+        },
+      );
 
-    if (!updated) {
-      throw new NotFoundException(`El empleado con el id ${id} no se encontró`);
-    }
+      if (updateEmpleadoDto.schedules !== undefined) {
+        const existingSchedules = await manager.find(Schedule, {
+          where: { employeeId: employee.userId },
+        });
 
-    try {
-      const result = await this.employeeRepository.save(updated);
-      return this.employeeRepository.findOne({
-        where: { userId: result.userId },
-        relations: { user: true },
+        const incomingIds = updateEmpleadoDto.schedules
+          .filter((s) => s.id)
+          .map((s) => s.id!);
+
+        const toDelete = existingSchedules.filter(
+          (s) => !incomingIds.includes(s.id),
+        );
+
+        if (toDelete.length) {
+          const scheduleIds = toDelete.map((s) => s.id);
+          await manager.delete(Group, { scheduleId: In(scheduleIds) });
+          await manager.delete(Schedule, { id: In(scheduleIds) });
+        }
+
+        for (const scheduleDto of updateEmpleadoDto.schedules) {
+          const { groups, id: scheduleId, ...scheduleData } = scheduleDto;
+
+          let schedule: Schedule;
+
+          if (scheduleId) {
+            await manager.update(
+              Schedule,
+              { id: scheduleId },
+              {
+                ...scheduleData,
+                employeeId: employee.userId,
+              },
+            );
+            schedule = (await manager.findOne(Schedule, {
+              where: { id: scheduleId },
+            }))!;
+          } else {
+            schedule = manager.create(Schedule, {
+              ...scheduleData,
+              employeeId: employee.userId,
+            });
+            await manager.save(schedule);
+          }
+
+          if (groups !== undefined) {
+            const existingGroups = await manager.find(Group, {
+              where: { scheduleId: schedule.id },
+            });
+
+            const incomingGroupIds = groups
+              .filter((g) => g.id)
+              .map((g) => g.id!);
+
+            const groupsToDelete = existingGroups.filter(
+              (g) => !incomingGroupIds.includes(g.id),
+            );
+
+            // ← aquí va, usando groupsToDelete (no toDelete)
+            if (groupsToDelete.length) {
+              await manager.delete(Group, {
+                id: In(groupsToDelete.map((g) => g.id)),
+              });
+            }
+
+            for (const groupDto of groups) {
+              const { id: groupId, ...groupData } = groupDto;
+
+              if (groupId) {
+                await manager.update(
+                  Group,
+                  { id: groupId },
+                  {
+                    ...groupData,
+                    employeeId: employee.userId,
+                    scheduleId: schedule.id,
+                  },
+                );
+              } else {
+                const newGroup = manager.create(Group, {
+                  ...groupData,
+                  employeeId: employee.userId,
+                  scheduleId: schedule.id,
+                });
+                await manager.save(newGroup);
+              }
+            }
+          }
+        }
+      }
+
+      return manager.findOne(Employee, {
+        where: { userId: employee.userId },
+        relations: {
+          user: true,
+          schedules: { groups: true },
+        },
       });
-    } catch (error: any) {
-      this.handleExceptions(error);
-    }
+    });
   }
 
   async remove(id: string) {
