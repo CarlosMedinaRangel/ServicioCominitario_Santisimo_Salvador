@@ -16,6 +16,7 @@ import { JwtPayload } from './interfaces/jwt-payload';
 import { JwtService } from '@nestjs/jwt';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { UpdateUserDto } from './dto/update-auth.dto';
+import { ValidRoles } from './interfaces/valid-roles';
 
 @Injectable()
 export class AuthService {
@@ -136,27 +137,54 @@ export class AuthService {
     secureUrl: string | undefined,
     publicId: string | undefined,
     updateUserDto: UpdateUserDto,
+    requestingUser?: User, // ← usuario autenticado
   ) {
-    const userActual = await this.userRepository.findOneBy({ id: userId });
+    const isAdmin = requestingUser?.roles?.includes(ValidRoles.admin) ?? false;
 
-    if (!userActual) {
-      throw new UnauthorizedException('Usuario no encontrado');
+    const { currentPassword, newPassword, removePhoto, ...profileData } =
+      updateUserDto;
+
+    const userActual = await this.userRepository.findOne({
+      where: { id: userId },
+      select: { id: true, password: true, publicId: true },
+    });
+
+    if (!userActual) throw new UnauthorizedException('Usuario no encontrado');
+
+    // ── Contraseña ────────────────────────────────────────────────────────
+    if (newPassword) {
+      if (isAdmin) {
+        // Admin verificado por roles reales: resetea sin pedir la actual
+      } else if (!currentPassword) {
+        throw new BadRequestException(
+          'Debes proporcionar la contraseña actual para poder cambiarla',
+        );
+      } else if (!bcrypt.compareSync(currentPassword, userActual.password)) {
+        throw new UnauthorizedException('La contraseña actual es incorrecta');
+      }
     }
 
-    // Borra imagen anterior si viene una nueva
-    if (secureUrl && userActual.publicId) {
+    // ── Foto ──────────────────────────────────────────────────────────────
+    let imagenUpdate:
+      { imagen: string | null; publicId: string | null } | undefined;
+
+    if (secureUrl) {
+      if (userActual.publicId)
+        await this.cloudinaryService.deleteFile(userActual.publicId);
+      imagenUpdate = { imagen: secureUrl, publicId: publicId! };
+    } else if (removePhoto && userActual.publicId) {
       await this.cloudinaryService.deleteFile(userActual.publicId);
+      imagenUpdate = { imagen: null, publicId: null };
     }
 
     const user = await this.userRepository.preload({
       id: userId,
-      ...updateUserDto,
-      ...(secureUrl ? { imagen: secureUrl, publicId } : {}),
+      ...profileData,
+      ...imagenUpdate,
+      ...(newPassword ? { password: bcrypt.hashSync(newPassword, 10) } : {}),
     });
 
-    if (!user) {
-      throw new UnauthorizedException('Usuario no encontrado');
-    }
+    if (!user) throw new UnauthorizedException('Usuario no encontrado');
 
     try {
       const result = await this.userRepository.save(user);
