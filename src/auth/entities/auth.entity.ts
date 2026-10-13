@@ -58,10 +58,10 @@ export class User {
   telefono?: string;
 
   @Column('text', { unique: true, nullable: true })
-  imagen?: string;
+  imagen?: string | null;
 
-  @Column({ nullable: true })
-  publicId?: string;
+  @Column('text', { nullable: true })
+  publicId?: string | null;
 
   @ApiProperty({
     example: true,

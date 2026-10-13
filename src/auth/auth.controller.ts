@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Patch,
+  Param,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
@@ -176,8 +177,8 @@ export class AuthController {
     return this.authService.checkAuthStatus(user);
   }
 
-  @Patch('update-profile')
-  @Auth()
+  @Patch('update-profile/:id')
+  @Auth(ValidRoles.admin)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -186,9 +187,12 @@ export class AuthController {
     }),
   )
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Actualizar perfil del usuario autenticado' })
-  async updateProfile(
-    @GetUser() user: User,
+  @ApiOperation({
+    summary: 'Admin: actualizar perfil de cualquier usuario por ID',
+  })
+  async updateProfileById(
+    @GetUser() requestingUser: User, // ← quien hace la petición
+    @Param('id') userId: string,
     @Body() updateUserDto: UpdateUserDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
@@ -204,8 +208,16 @@ export class AuthController {
       publicId = uploaded.publicId;
     }
 
-    return this.authService.update(user.id, secureUrl, publicId, updateUserDto);
+    return this.authService.update(
+      userId,
+      secureUrl,
+      publicId,
+      updateUserDto,
+      requestingUser,
+    );
   }
+
+
 
   @Get('private')
   @UseGuards(AuthGuard('jwt'))
