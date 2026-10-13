@@ -217,7 +217,42 @@ export class AuthController {
     );
   }
 
+  @Patch('update-profile')
+  @Auth() // cualquier usuario autenticado, sin rol
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      fileFilter: imageFileFilter,
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Actualizar mi propio perfil' })
+  async updateMyProfile(
+    @GetUser() user: User,
+    @Body() updateUserDto: UpdateUserDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    let secureUrl: string | undefined;
+    let publicId: string | undefined;
 
+    if (file) {
+      const uploaded = await this.cloudinaryService.uploadFile(
+        file,
+        'usuarios',
+      );
+      secureUrl = uploaded.secureUrl;
+      publicId = uploaded.publicId;
+    }
+
+    return this.authService.update(
+      user.id,
+      secureUrl,
+      publicId,
+      updateUserDto,
+      user,
+    );
+  }
 
   @Get('private')
   @UseGuards(AuthGuard('jwt'))
