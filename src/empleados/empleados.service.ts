@@ -378,6 +378,20 @@ export class EmpleadosService {
     });
   }
 
+  async updateByUserId(userId: string, dto: UpdateEmpleadoDto) {
+    const employee = await this.employeeRepository.findOne({
+      where: { userId },
+      relations: { schedules: true, groups: true },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('No tienes datos de empleado registrados');
+    }
+
+    // Reutiliza el método update existente con el id real del empleado
+    return this.update(employee.userId, dto);
+  }
+
   async remove(id: string) {
     const employee = await this.findOne(id);
 
