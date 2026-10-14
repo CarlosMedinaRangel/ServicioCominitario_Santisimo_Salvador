@@ -19,6 +19,7 @@ import { JwtService } from '@nestjs/jwt';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { TurnstileService } from './services/turnstile.service';
 import { UpdateUserDto } from './dto/update-auth.dto';
+import { CryptoService } from 'src/crypto/crypto.service';
 
 @Injectable()
 export class AuthService {
@@ -28,16 +29,18 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly turnstileService: TurnstileService,
+    private readonly cryptoService: CryptoService,
   ) {}
 
   async create(secureUrl, publicId, CreateUserDto: CreateUserDto) {
     try {
       const { password, ...UserData } = CreateUserDto;
+      const hashedPassword = await bcrypt.hash(password, 10);
       const user = this.userRepository.create({
         ...UserData,
         imagen: secureUrl ?? CreateUserDto.imagen,
         publicId: publicId ?? CreateUserDto.publicId,
-        password: bcrypt.hashSync(password, 10),
+        password: hashedPassword,
       });
 
       await this.userRepository.save(user);
@@ -68,6 +71,7 @@ export class AuthService {
         telefono: true,
         failedLoginAttempts: true,
         lockedUntil: true,
+        lastFailedAttemptAt: true,
       },
     });
 
@@ -75,11 +79,13 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    const now = Date.now();
+
     // 3. Account Lockout Check
     if (user.lockedUntil && new Date() < new Date(user.lockedUntil)) {
       const remainingMinutes = Math.max(
         1,
-        Math.ceil((new Date(user.lockedUntil).getTime() - Date.now()) / 60000),
+        Math.ceil((new Date(user.lockedUntil).getTime() - now) / 60000),
       );
       throw new HttpException(
         {
@@ -91,8 +97,23 @@ export class AuthService {
       );
     }
 
+    // 3.1 Sliding Window Expiry (1 hour TTL on failed attempts)
+    // If the account is not actively locked and more than 1 hour passed since the last failure, reset counter
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    if (
+      user.failedLoginAttempts > 0 &&
+      user.lastFailedAttemptAt &&
+      now - new Date(user.lastFailedAttemptAt).getTime() > ONE_HOUR_MS
+    ) {
+      user.failedLoginAttempts = 0;
+      user.lockedUntil = null;
+      user.lastFailedAttemptAt = null;
+    }
+
     // 4. Password Verification
-    if (!bcrypt.compareSync(password, user.password)) {
+    const passwordValid = await bcrypt.compare(password, user.password);
+    if (!passwordValid) {
+      user.lastFailedAttemptAt = new Date();
       user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
 
       if (user.failedLoginAttempts >= 5) {
@@ -116,10 +137,15 @@ export class AuthService {
       );
     }
 
-    // 5. Successful Login: Reset failure counters
-    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+    // 5. Successful Login: Reset all failure counters and timestamps
+    if (
+      user.failedLoginAttempts > 0 ||
+      user.lockedUntil ||
+      user.lastFailedAttemptAt
+    ) {
       user.failedLoginAttempts = 0;
       user.lockedUntil = null;
+      user.lastFailedAttemptAt = null;
       await this.userRepository.save(user);
     }
 
@@ -146,6 +172,21 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
+    let digitalIdToken: string | null = null;
+    if (user.employee) {
+      digitalIdToken = this.cryptoService.encryptPayload(
+        {
+          employeeId: user.employee.userId,
+          userId: user.id,
+          cedula: user.cedula || '',
+          fullName: user.fullName,
+          cargo: user.employee.position,
+          issuedAt: new Date().toISOString(),
+        },
+        'EDID',
+      );
+    }
+
     return {
       user: {
         id: user.id,
@@ -158,6 +199,7 @@ export class AuthService {
         imagen: user.imagen,
       },
       employee: user.employee || null,
+      digitalIdToken,
     };
   }
 

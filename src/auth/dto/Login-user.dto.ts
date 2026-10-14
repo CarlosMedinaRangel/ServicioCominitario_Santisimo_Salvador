@@ -1,5 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
@@ -33,12 +34,21 @@ export class LoginUserDto {
   })
   password!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '0.xxxxxxxxxxx.xxxxxxxxx',
     description: 'Token de verificación de Cloudflare Turnstile anti-bot',
-    required: false,
   })
   @IsString()
   @IsOptional()
   turnstileToken?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Si es true, la cookie persiste por 30 días. Si es false, es una cookie de sesión eliminada al cerrar el navegador.',
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  rememberMe?: boolean;
 }

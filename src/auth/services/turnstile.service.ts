@@ -16,8 +16,11 @@ export class TurnstileService {
    * it gracefully bypasses verification to facilitate testing.
    */
   async verifyToken(token?: string, remoteIp?: string): Promise<boolean> {
-    // If no secret key is configured in .env, permit development bypass
-    if (!this.secretKey || this.secretKey === 'disabled' || this.secretKey === 'bypass') {
+    if (
+      !this.secretKey ||
+      this.secretKey === 'disabled' ||
+      this.secretKey === 'bypass'
+    ) {
       return true;
     }
 

@@ -20,6 +20,6 @@ import { DocumentsModule } from 'src/documents/documents.module';
     PrinterModule,
     DocumentsModule,
   ],
-  exports: [TypeOrmModule, EmpleadosModule, EmpleadosService, CloudinaryModule],
+  exports: [TypeOrmModule, EmpleadosService, CloudinaryModule],
 })
 export class EmpleadosModule {}

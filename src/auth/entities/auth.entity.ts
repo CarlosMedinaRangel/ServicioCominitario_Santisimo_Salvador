@@ -94,6 +94,12 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   lockedUntil?: Date | null;
 
+  @ApiPropertyOptional({
+    description: 'Fecha y hora del último intento fallido de inicio de sesión',
+  })
+  @Column({ type: 'timestamp', nullable: true })
+  lastFailedAttemptAt?: Date | null;
+
   @OneToOne(() => Employee, (employee) => employee.user)
   employee?: Employee;
 

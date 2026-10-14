@@ -20,6 +20,7 @@ import { employementLetterReportByID } from 'src/reports/employementLetterByID.r
 import { constanciaMensualReport } from 'src/reports/constanciaMensual.report';
 import { DocumentsService } from 'src/documents/documents.service';
 import { DocumentType, RecipientType } from 'src/documents/entities/document-verification.entity';
+import { CryptoService } from 'src/crypto/crypto.service';
 import * as bcrypt from 'bcrypt';
 import * as XLSX from 'xlsx';
 
@@ -53,6 +54,7 @@ export class EmpleadosService {
     private readonly userRepository: Repository<User>,
     private readonly PrinterService: PrinterService,
     private readonly documentsService: DocumentsService,
+    private readonly cryptoService: CryptoService,
   ) {}
 
   async create(createEmpleadoDto: CreateEmpleadoDto) {
@@ -68,7 +70,7 @@ export class EmpleadosService {
       const employee = this.employeeRepository.create({
         userId: user.id,
         position: createEmpleadoDto.position,
-        start_date: createEmpleadoDto.start_date as any,
+        start_date: new Date(createEmpleadoDto.start_date),
         work_time: createEmpleadoDto.work_time,
         hours_per_day: createEmpleadoDto.hours_per_day,
         work_schedule: createEmpleadoDto.work_schedule,
@@ -83,8 +85,21 @@ export class EmpleadosService {
     }
   }
 
-  async findAll() {
-    return this.employeeRepository.find({ relations: { user: true } });
+  async findAll(status?: string) {
+    if (status === 'all') {
+      return this.employeeRepository.find({ relations: { user: true } });
+    }
+    if (status === 'inactive') {
+      return this.employeeRepository.find({
+        where: { user: { isActive: false } },
+        relations: { user: true },
+      });
+    }
+    // Por defecto, retorna solo empleados activos (ignora eliminados lógicamente)
+    return this.employeeRepository.find({
+      where: { user: { isActive: true } },
+      relations: { user: true },
+    });
   }
 
   async findOne(id: string) {
@@ -118,7 +133,19 @@ export class EmpleadosService {
       throw new BadRequestException(`No hay empleado con este "${id}" ID`);
     }
 
-    return employee;
+    const digitalIdToken = this.cryptoService.encryptPayload(
+      {
+        employeeId: employee.userId,
+        userId: employee.user.id,
+        cedula: employee.user.cedula || '',
+        fullName: employee.user.fullName,
+        cargo: employee.position,
+        issuedAt: new Date().toISOString(),
+      },
+      'EDID',
+    );
+
+    return Object.assign(employee, { digitalIdToken });
   }
 
   async findSchedules(employeeId: string) {
@@ -252,10 +279,39 @@ export class EmpleadosService {
 
   async remove(id: string) {
     const employee = await this.findOne(id);
+    const user = await this.userRepository.findOneBy({ id: employee.userId });
+    if (!user) {
+      throw new NotFoundException(`Usuario no encontrado para el empleado ${id}`);
+    }
 
     try {
-      await this.employeeRepository.remove(employee);
-      return `Eliminado`;
+      user.isActive = false;
+      await this.userRepository.save(user);
+      return {
+        message: `Empleado ${user.fullName} desactivado exitosamente (eliminación lógica)`,
+        userId: user.id,
+        isActive: false,
+      };
+    } catch (error: any) {
+      this.handleExceptions(error);
+    }
+  }
+
+  async toggleStatus(id: string) {
+    const employee = await this.findOne(id);
+    const user = await this.userRepository.findOneBy({ id: employee.userId });
+    if (!user) {
+      throw new NotFoundException(`Usuario no encontrado para el empleado ${id}`);
+    }
+
+    try {
+      user.isActive = !user.isActive;
+      await this.userRepository.save(user);
+      return {
+        message: `Empleado ${user.fullName} ${user.isActive ? 'activado' : 'desactivado'} exitosamente`,
+        userId: user.id,
+        isActive: user.isActive,
+      };
     } catch (error: any) {
       this.handleExceptions(error);
     }
@@ -325,9 +381,10 @@ export class EmpleadosService {
           const password = data.password
             ? String(data.password)
             : `${data.cedula || 'Default'}123!`;
+          const hashedPassword = await bcrypt.hash(password, 10);
           user = this.userRepository.create({
             email: String(data.email || `${data.cedula}@santisimo.edu`).toLowerCase().trim(),
-            password: bcrypt.hashSync(password, 10),
+            password: hashedPassword,
             fullName: String(data.fullName || data.name || 'Sin Nombre'),
             roles: ['user'],
             isActive: true,
@@ -350,8 +407,8 @@ export class EmpleadosService {
         const employeeData: Partial<Employee> = {
           position: data.position ? String(data.position) : 'General',
           start_date: data.start_date
-            ? (this.formatDateValue(data.start_date) as any)
-            : (new Date().toISOString().split('T')[0] as any),
+            ? new Date(this.formatDateValue(data.start_date))
+            : new Date(),
           work_time: data.work_time ? String(data.work_time) : '08:00:00',
           hours_per_day: data.hours_per_day ? Number(data.hours_per_day) : 8,
           work_schedule: data.work_schedule
