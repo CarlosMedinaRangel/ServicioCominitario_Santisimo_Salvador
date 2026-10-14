@@ -15,31 +15,33 @@ import { CryptoService, QrDocumentPayload } from '../crypto/crypto.service';
 import { QrGeneratorService } from '../crypto/qr-generator.service';
 import { randomUUID } from 'node:crypto';
 
+import { User } from '../auth/entities/auth.entity';
+
 export interface IssueDocumentParams {
-  documentType: DocumentType;
-  recipientType: RecipientType;
-  recipientId: string;
-  recipientIdentifier: string;
-  recipientName: string;
-  issuedByUserId?: string;
-  issuedByName?: string;
-  metadata?: Record<string, any>;
+  documentType: DocumentVerification['documentType'];
+  recipientType: DocumentVerification['recipientType'];
+  recipientId: DocumentVerification['recipientId'];
+  recipientIdentifier: DocumentVerification['recipientIdentifier'];
+  recipientName: DocumentVerification['recipientName'];
+  issuedByUserId?: DocumentVerification['issuedByUserId'];
+  issuedByName?: DocumentVerification['issuedByName'];
+  metadata?: DocumentVerification['metadata'];
 }
 
 export interface VerificationResult {
   isValid: boolean;
-  status: DocumentStatus | 'COUNTERFEIT';
+  status: DocumentVerification['status'] | 'COUNTERFEIT';
   message: string;
   document?: {
-    id: string;
-    documentType: DocumentType;
-    recipientType: RecipientType;
-    recipientId: string;
-    recipientIdentifier: string;
-    recipientName: string;
-    issuedByName?: string;
-    issuedAt: Date;
-    metadata?: Record<string, any>;
+    id: DocumentVerification['id'];
+    documentType: DocumentVerification['documentType'] | string;
+    recipientType: DocumentVerification['recipientType'];
+    recipientId: DocumentVerification['recipientId'];
+    recipientIdentifier: DocumentVerification['recipientIdentifier'];
+    recipientName: DocumentVerification['recipientName'];
+    issuedByName?: DocumentVerification['issuedByName'];
+    issuedAt: DocumentVerification['issuedAt'];
+    metadata?: DocumentVerification['metadata'];
   };
 }
 
@@ -48,6 +50,8 @@ export class DocumentsService {
   constructor(
     @InjectRepository(DocumentVerification)
     private readonly docVerificationRepo: Repository<DocumentVerification>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly cryptoService: CryptoService,
     private readonly qrGeneratorService: QrGeneratorService,
   ) {}
@@ -72,8 +76,8 @@ export class DocumentsService {
       issuedByUserId: params.issuedByUserId,
     };
 
-    // Encrypt payload into tamper-proof token
-    const verificationCode = this.cryptoService.encryptPayload(payload);
+    // Encrypt payload into tamper-proof token explicitly specifying 'DOC' subtype
+    const verificationCode = this.cryptoService.encryptPayload(payload, 'DOC');
 
     // Generate QR Code PNG base64 Data URL for PDF insertion
     const qrDataUrl =
@@ -105,13 +109,89 @@ export class DocumentsService {
 
   /**
    * Validates a physical/scanned QR code:
-   * 1. Decrypts AES-256-GCM cipher with MAC integrity check.
-   * 2. Cross-references database record.
-   * 3. Checks revocation status.
+   * 1. Inspects token header (determines whether it's DOC or EDID/DID).
+   * 2. Decrypts AES-256-GCM cipher with MAC integrity check.
+   * 3. Cross-references database record and revocation status.
    */
   async verifyDocument(code: string): Promise<VerificationResult> {
-    // Step 1: Decrypt and check cryptographic authentication tag
-    const payload = this.cryptoService.decryptPayload<QrDocumentPayload>(code);
+    const header = this.cryptoService.inspectToken(code);
+    if (!header.isValidHeader) {
+      throw new BadRequestException('Estructura de sello digital inválida o irreconocible.');
+    }
+
+    // Branch 1: Employee / Student Digital ID Verification
+    if (header.subType === 'EDID' || header.subType === 'DID') {
+      const payload = this.cryptoService.decryptPayload(code, 'EDID');
+      const user = await this.userRepo.findOne({
+        where: { id: payload.userId },
+        relations: { employee: true },
+      });
+
+      if (!user) {
+        return {
+          isValid: false,
+          status: 'COUNTERFEIT',
+          message:
+            'Carnet falsificado o no registrado: El identificador del usuario no existe en los registros de la institución.',
+        };
+      }
+
+      if (!user.employee) {
+        return {
+          isValid: false,
+          status: 'COUNTERFEIT',
+          message:
+            'El usuario asociado al carnet no posee registro de empleado docente ni administrativo.',
+        };
+      }
+
+      if (!user.isActive) {
+        return {
+          isValid: false,
+          status: DocumentStatus.REVOKED,
+          message:
+            'Credencial inactiva: El titular de este carnet se encuentra actualmente desvinculado o inactivo en la institución.',
+          document: {
+            id: user.employee.userId,
+            documentType: 'CARNET_DIGITAL_EMPLEADO',
+            recipientType: RecipientType.EMPLOYEE,
+            recipientId: user.id,
+            recipientIdentifier: user.cedula || payload.cedula,
+            recipientName: user.fullName,
+            issuedByName: 'Dirección del Plantel',
+            issuedAt: new Date(payload.issuedAt),
+            metadata: {
+              cargo: user.employee.position,
+              estatusLaboral: 'INACTIVO / DESVINCULADO',
+            },
+          },
+        };
+      }
+
+      return {
+        isValid: true,
+        status: DocumentStatus.VALID,
+        message: 'Carnet de Identificación Digital verificado con éxito.',
+        document: {
+          id: user.employee.userId,
+          documentType: 'CARNET_DIGITAL_EMPLEADO',
+          recipientType: RecipientType.EMPLOYEE,
+          recipientId: user.id,
+          recipientIdentifier: user.cedula || payload.cedula,
+          recipientName: user.fullName,
+          issuedByName: 'Dirección del Plantel',
+          issuedAt: new Date(payload.issuedAt),
+          metadata: {
+            cargo: user.employee.position,
+            correo: user.email,
+            telefono: user.telefono,
+          },
+        },
+      };
+    }
+
+    // Branch 2: Official Document Verification ('DOC')
+    const payload = this.cryptoService.decryptPayload(code, 'DOC');
 
     if (!payload || !payload.uuid) {
       throw new BadRequestException('El código no contiene un UUID válido.');

@@ -2,6 +2,9 @@ import type { StyleDictionary } from 'pdfmake/build/pdfmake';
 import type { TDocumentDefinitions } from 'src/interfaces/pdfmake.interface';
 import { headerSection } from './sections/header.section';
 import { DateFormatter } from 'src/helpers/date-formatter';
+import { User } from 'src/auth/entities/auth.entity';
+import { Employee } from 'src/empleados/entities/employee.entity';
+import { DocumentVerification } from 'src/documents/entities/document-verification.entity';
 
 const styles: StyleDictionary = {
   header: {
@@ -54,17 +57,17 @@ interface ActivityData {
 interface MonthlyReportProps {
   employerName: string;
   employerPosition: string;
-  employeeName: string;
-  employeeCedula: string;
-  employeePosition: string;
-  employeeStartDate: Date;
-  employeeHours: number;
-  employeeWorkSchedule: string;
+  employeeName: User['fullName'];
+  employeeCedula: NonNullable<User['cedula']>;
+  employeePosition: Employee['position'];
+  employeeStartDate: Employee['start_date'];
+  employeeHours: Employee['hours_per_day'];
+  employeeWorkSchedule: Employee['work_schedule'];
   employerCompany: string;
   month: string;
   activities: ActivityData[];
   qrDataUrl?: string;
-  verificationId?: string;
+  verificationId?: DocumentVerification['id'];
 }
 
 const monthsMap: Record<string, string> = {
