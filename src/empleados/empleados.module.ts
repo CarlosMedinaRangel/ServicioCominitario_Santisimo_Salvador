@@ -9,15 +9,22 @@ import { Activity } from './entities/activity.entity';
 import { PrinterModule } from 'src/printer/printer.module';
 import { User } from 'src/auth/entities/auth.entity';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { ActivityService } from './activity-service/activity-service.service';
 
 @Module({
   controllers: [EmpleadosController],
-  providers: [EmpleadosService],
+  providers: [EmpleadosService, ActivityService],
   imports: [
     TypeOrmModule.forFeature([Employee, Schedule, Group, Activity, User]),
     CloudinaryModule,
     PrinterModule,
   ],
-  exports: [TypeOrmModule, EmpleadosModule, EmpleadosService, CloudinaryModule],
+  exports: [
+    TypeOrmModule,
+    EmpleadosModule,
+    EmpleadosService,
+    CloudinaryModule,
+    ActivityService,
+  ],
 })
 export class EmpleadosModule {}

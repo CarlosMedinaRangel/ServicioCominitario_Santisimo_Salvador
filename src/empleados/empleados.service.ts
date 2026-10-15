@@ -20,6 +20,10 @@ import { employementLetterReportByID } from 'src/reports/employementLetterByID.r
 import { constanciaMensualReport } from 'src/reports/constanciaMensual.report';
 import * as bcrypt from 'bcrypt';
 import * as XLSX from 'xlsx';
+import {
+  ActivityService,
+  LogActivityInput,
+} from './activity-service/activity-service.service';
 
 export interface UploadError {
   row: number;
@@ -51,6 +55,7 @@ export class EmpleadosService {
     private readonly userRepository: Repository<User>,
     private readonly PrinterService: PrinterService,
     private readonly dataSource: DataSource,
+    private readonly activityService: ActivityService,
   ) {}
 
   async create(createEmpleadoDto: CreateEmpleadoDto) {
@@ -254,8 +259,9 @@ export class EmpleadosService {
 
   async update(id: string, updateEmpleadoDto: UpdateEmpleadoDto) {
     const employee = await this.findOne(id);
+    const activities: LogActivityInput[] = [];
 
-    return await this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       await manager.update(
         Employee,
         { userId: employee.userId },
@@ -277,6 +283,38 @@ export class EmpleadosService {
           }),
         },
       );
+      if (
+        updateEmpleadoDto.position &&
+        updateEmpleadoDto.position !== employee.position
+      ) {
+        activities.push({
+          tipo: 'Actualización Laboral',
+          descripcion: 'Cargo actualizado',
+          detalle: `Cargo cambiado a "${updateEmpleadoDto.position}"`,
+        });
+      }
+
+      if (
+        updateEmpleadoDto.work_schedule &&
+        updateEmpleadoDto.work_schedule !== employee.work_schedule
+      ) {
+        activities.push({
+          tipo: 'Actualización Laboral',
+          descripcion: 'Horario laboral actualizado',
+          detalle: `Nuevo horario: ${updateEmpleadoDto.work_schedule}`,
+        });
+      }
+
+      if (
+        updateEmpleadoDto.hours_per_day !== undefined &&
+        updateEmpleadoDto.hours_per_day !== employee.hours_per_day
+      ) {
+        activities.push({
+          tipo: 'Actualización Laboral',
+          descripcion: 'Horas por día actualizadas',
+          detalle: `Horas cambiadas a ${updateEmpleadoDto.hours_per_day}h/día`,
+        });
+      }
 
       if (updateEmpleadoDto.schedules !== undefined) {
         const existingSchedules = await manager.find(Schedule, {
@@ -293,6 +331,14 @@ export class EmpleadosService {
 
         if (toDelete.length) {
           const scheduleIds = toDelete.map((s) => s.id);
+
+          for (const s of toDelete) {
+            activities.push({
+              tipo: 'Materia Eliminada',
+              descripcion: s.nombre,
+              detalle: `Aula: ${s.aula}`,
+            });
+          }
           await manager.delete(Group, { scheduleId: In(scheduleIds) });
           await manager.delete(Schedule, { id: In(scheduleIds) });
         }
@@ -319,6 +365,12 @@ export class EmpleadosService {
               ...scheduleData,
               employeeId: employee.userId,
             });
+            activities.push({
+              tipo: 'Nueva Materia',
+              descripcion: scheduleDto?.nombre ?? '',
+              detalle: `Aula: ${scheduleDto.aula}`,
+              destacada: true,
+            });
             await manager.save(schedule);
           }
 
@@ -337,6 +389,13 @@ export class EmpleadosService {
 
             // ← aquí va, usando groupsToDelete (no toDelete)
             if (groupsToDelete.length) {
+              for (const g of groupsToDelete) {
+                activities.push({
+                  tipo: 'Grupo Eliminado',
+                  descripcion: g.nombre,
+                  detalle: `${g.cantidadEstudiantes} estudiantes`,
+                });
+              }
               await manager.delete(Group, {
                 id: In(groupsToDelete.map((g) => g.id)),
               });
@@ -361,6 +420,12 @@ export class EmpleadosService {
                   employeeId: employee.userId,
                   scheduleId: schedule.id,
                 });
+                activities.push({
+                  tipo: 'Nuevo Grupo',
+                  descripcion: groupDto.nombre ?? '',
+                  detalle: `${groupDto.cantidadEstudiantes} estudiantes`,
+                  destacada: false,
+                });
                 await manager.save(newGroup);
               }
             }
@@ -376,6 +441,9 @@ export class EmpleadosService {
         },
       });
     });
+
+    void this.activityService.logMany(employee.userId, activities);
+    return result;
   }
 
   async updateByUserId(userId: string, dto: UpdateEmpleadoDto) {

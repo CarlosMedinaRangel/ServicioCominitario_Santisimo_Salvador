@@ -8,6 +8,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './strategies/jew.strategy';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { EmpleadosModule } from 'src/empleados/empleados.module';
 
 @Module({
   controllers: [AuthController],
@@ -15,6 +16,7 @@ import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
   imports: [
     ConfigModule,
     CloudinaryModule,
+    EmpleadosModule,
     TypeOrmModule.forFeature([User]),
 
     PassportModule.register({ defaultStrategy: 'jwt' }),

@@ -17,6 +17,10 @@ import { JwtService } from '@nestjs/jwt';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { UpdateUserDto } from './dto/update-auth.dto';
 import { ValidRoles } from './interfaces/valid-roles';
+import {
+  ActivityService,
+  LogActivityInput,
+} from 'src/empleados/activity-service/activity-service.service';
 
 @Injectable()
 export class AuthService {
@@ -26,6 +30,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
 
     private readonly cloudinaryService: CloudinaryService,
+    private readonly activityService: ActivityService,
   ) {}
 
   async create(secureUrl, publicId, CreateUserDto: CreateUserDto) {
@@ -146,10 +151,61 @@ export class AuthService {
 
     const userActual = await this.userRepository.findOne({
       where: { id: userId },
-      select: { id: true, password: true, publicId: true },
+      select: {
+        id: true,
+        password: true,
+        publicId: true,
+        fullName: true,
+        email: true,
+      },
     });
 
     if (!userActual) throw new UnauthorizedException('Usuario no encontrado');
+
+    const activities: LogActivityInput[] = [];
+
+    if (profileData.fullName && profileData.fullName !== userActual.fullName) {
+      activities.push({
+        tipo: 'Actualización de Perfil',
+        descripcion: 'Nombre actualizado',
+        detalle: `Nombre cambiado a "${profileData.fullName}"`,
+      });
+    }
+
+    if (profileData.email && profileData.email !== userActual.email) {
+      activities.push({
+        tipo: 'Actualización de Perfil',
+        descripcion: 'Correo actualizado',
+        detalle: `Correo cambiado a "${profileData.email}"`,
+      });
+    }
+
+    if (newPassword) {
+      activities.push({
+        tipo: 'Cambio de Contraseña',
+        descripcion: 'Contraseña actualizada',
+        detalle: isAdmin
+          ? 'Contraseña restablecida por un administrador'
+          : 'El empleado cambió su contraseña',
+        destacada: true,
+      });
+    }
+
+    if (secureUrl) {
+      activities.push({
+        tipo: 'Actualización de Perfil',
+        descripcion: 'Foto de perfil actualizada',
+        detalle: 'Nueva foto de perfil subida',
+      });
+    }
+
+    if (removePhoto) {
+      activities.push({
+        tipo: 'Actualización de Perfil',
+        descripcion: 'Foto de perfil eliminada',
+        detalle: 'Foto de perfil removida',
+      });
+    }
 
     // ── Contraseña ────────────────────────────────────────────────────────
     if (newPassword) {
@@ -189,6 +245,7 @@ export class AuthService {
     try {
       const result = await this.userRepository.save(user);
       const { password, ...userInfo } = result;
+      await this.activityService.logMany(userId, activities);
       return userInfo;
     } catch (error: any) {
       this.handleDBErrors(error);
