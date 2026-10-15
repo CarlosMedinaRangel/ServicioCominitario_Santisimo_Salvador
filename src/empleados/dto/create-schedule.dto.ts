@@ -9,7 +9,14 @@ import {
   ArrayMinSize,
 } from 'class-validator';
 
-const DIAS_VALIDOS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const DIAS_VALIDOS = [
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+];
 
 export class CreateScheduleDto {
   @ApiProperty({ example: 'Biología Molecular III' })
@@ -30,11 +37,15 @@ export class CreateScheduleDto {
   @Matches(/^\d{2}:\d{2}$/, { message: 'Formato HH:MM requerido' })
   horaFin!: string;
 
-  @ApiProperty({ example: ['Lunes', 'Miércoles'], description: 'Uno o más días de la semana' })
+  @ApiProperty({
+    example: ['Lunes', 'Miércoles'],
+    description: 'Uno o más días de la semana',
+  })
+  @IsOptional()
   @IsArray()
   @ArrayMinSize(1, { message: 'Debe seleccionar al menos un día' })
   @IsIn(DIAS_VALIDOS, { each: true, message: 'Día no válido' })
-  dias!: string[];
+  dias?: string[];
 
   @ApiProperty({ example: 'flask' })
   @IsString()

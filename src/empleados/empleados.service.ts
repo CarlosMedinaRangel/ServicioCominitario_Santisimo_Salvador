@@ -434,6 +434,7 @@ export class EmpleadosService {
       try {
         const data = this.extractRowData(row, mapping);
 
+        // El upload identifica empleados por cédula (o email si lo incluyeron)
         if (!data.email && !data.cedula) {
           errors.push({
             row: rowNum,
@@ -443,8 +444,9 @@ export class EmpleadosService {
           continue;
         }
 
-        // Find or create user
+        // ── Buscar o crear usuario ────────────────────────────────────────────
         let user: User | null = null;
+
         if (data.email) {
           user = await this.userRepository.findOneBy({
             email: String(data.email).toLowerCase().trim(),
@@ -459,7 +461,6 @@ export class EmpleadosService {
         }
 
         if (user) {
-          // Update existing user
           const userUpdates: Partial<User> = {};
           if (data.fullName) userUpdates.fullName = String(data.fullName);
           if (data.email)
@@ -473,10 +474,10 @@ export class EmpleadosService {
             userUpdates.telefono = String(data.telefono).replace(/\D/g, '');
           await this.userRepository.save({ ...user, ...userUpdates });
         } else {
-          // Create new user
           const password = data.password
             ? String(data.password)
             : `${data.cedula || 'Default'}123!`;
+
           user = this.userRepository.create({
             email: String(data.email || `${data.cedula}@santisimo.edu`)
               .toLowerCase()
@@ -496,7 +497,9 @@ export class EmpleadosService {
           user = await this.userRepository.save(user);
         }
 
-        // Find or create employee
+        // ── Buscar o crear empleado (solo datos base) ─────────────────────────
+        // El upload masivo NO crea schedules ni groups — esos se asignan
+        // después desde el formulario individual, donde tienen sentido anidados.
         let employee = await this.employeeRepository.findOneBy({
           userId: user.id,
         });
@@ -506,7 +509,9 @@ export class EmpleadosService {
           start_date: data.start_date
             ? (this.formatDateValue(data.start_date) as any)
             : (new Date().toISOString().split('T')[0] as any),
-          work_time: data.work_time ? String(data.work_time) : '08:00:00',
+          work_time: data.work_time
+            ? this.normalizeTime(String(data.work_time))
+            : '08:00', // 👈 normalizado
           hours_per_day: data.hours_per_day ? Number(data.hours_per_day) : 8,
           work_schedule: data.work_schedule
             ? String(data.work_schedule)
@@ -540,6 +545,8 @@ export class EmpleadosService {
     return { success: errors.length === 0, created, updated, errors };
   }
 
+  // ── Helpers privados ──────────────────────────────────────────────────────
+
   private extractRowData(
     row: unknown[],
     mapping: Record<string, number>,
@@ -554,9 +561,7 @@ export class EmpleadosService {
   }
 
   private formatDateValue(value: unknown): string {
-    if (value instanceof Date) {
-      return value.toISOString().split('T')[0];
-    }
+    if (value instanceof Date) return value.toISOString().split('T')[0];
     if (typeof value === 'number') {
       const date = XLSX.SSF?.parse_date_code?.(value);
       if (date?.y && date?.m && date?.d) {
@@ -565,12 +570,16 @@ export class EmpleadosService {
     }
     if (typeof value === 'string') {
       const parsed = new Date(value);
-      if (!isNaN(parsed.getTime())) {
-        return parsed.toISOString().split('T')[0];
-      }
+      if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
       return value;
     }
     return '';
+  }
+
+  private normalizeTime(value: string): string {
+    const match = value.match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return value;
+    return `${match[1].padStart(2, '0')}:${match[2]}`;
   }
 
   async seedActivities(employeeId: string, month: string) {
