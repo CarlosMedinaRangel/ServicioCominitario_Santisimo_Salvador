@@ -63,9 +63,18 @@ interface MonthlyReportProps {
 }
 
 const monthsMap: Record<string, string> = {
-  '01': 'enero', '02': 'febrero', '03': 'marzo', '04': 'abril',
-  '05': 'mayo', '06': 'junio', '07': 'julio', '08': 'agosto',
-  '09': 'septiembre', '10': 'octubre', '11': 'noviembre', '12': 'diciembre',
+  '01': 'enero',
+  '02': 'febrero',
+  '03': 'marzo',
+  '04': 'abril',
+  '05': 'mayo',
+  '06': 'junio',
+  '07': 'julio',
+  '08': 'agosto',
+  '09': 'septiembre',
+  '10': 'octubre',
+  '11': 'noviembre',
+  '12': 'diciembre',
 };
 
 function formatMonth(monthStr: string): string {
@@ -85,9 +94,17 @@ export const constanciaMensualReport = (
   props: MonthlyReportProps,
 ): TDocumentDefinitions => {
   const {
-    employeeName, employeeCedula, employeePosition, employeeHours,
-    employeeStartDate, employeeWorkSchedule, employerCompany,
-    employerName, employerPosition, month, activities,
+    employeeName,
+    employeeCedula,
+    employeePosition,
+    employeeHours,
+    employeeStartDate,
+    employeeWorkSchedule,
+    employerCompany,
+    employerName,
+    employerPosition,
+    month,
+    activities,
   } = props;
 
   const activityRows = activities.map((a) => [
@@ -114,42 +131,23 @@ export const constanciaMensualReport = (
           `Yo, ${employerName}, en mi calidad de ${employerPosition} de ${employerCompany}, por medio de la presente certifico que `,
           { text: `${employeeName}`, bold: true },
           `, portador de la cédula de identidad Nº ${employeeCedula}, ha laborado en nuestra institución desde el `,
-          { text: `${DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate))}`, bold: false },
+          {
+            text: `${DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate))}`,
+            bold: false,
+          },
           `, desempeñando el cargo de `,
           { text: `${employeePosition}`, bold: true },
           `, con una jornada de ${employeeHours} horas semanales, en horario de ${employeeWorkSchedule}.\n\n`,
-          `Durante el mes de ${formatMonth(month)}, el empleado realizó las siguientes actividades:`,
         ],
         style: 'body',
       },
-      activities.length > 0
-        ? {
-            table: {
-              headerRows: 1,
-              widths: ['25%', '20%', '30%', '25%'],
-              body: [
-                [
-                  { text: 'Fecha', style: 'tableHeader' },
-                  { text: 'Tipo', style: 'tableHeader' },
-                  { text: 'Descripción', style: 'tableHeader' },
-                  { text: 'Detalle', style: 'tableHeader' },
-                ],
-                ...activityRows,
-              ],
-            },
-            layout: 'lightHorizontalLines',
-            margin: [0, 10, 0, 20],
-          }
-        : {
-            text: 'No se registraron actividades para este periodo.',
-            italics: true,
-            margin: [0, 10, 0, 20],
-          },
+
       {
         text: 'Se expide la presente constancia a solicitud del interesado para los fines que considere pertinentes.',
         style: 'body',
         margin: [0, 10, 0, 40],
       },
+      '\n\n\n\n\n\n',
       { text: 'Atentamente,', style: 'signature' },
       { text: employerName, style: 'signature' },
       { text: employerPosition, style: 'signature' },
