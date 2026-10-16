@@ -239,7 +239,15 @@ export class EmpleadosService {
         })),
       });
 
-      return this.PrinterService.createPdf(docDefinition);
+      const pdf = this.PrinterService.createPdf(docDefinition);
+      void this.activityService.log(employee.userId, {
+        tipo: 'Constancia Generada',
+        descripcion: `Constancia mensual de ${monthStr}-${yearStr}`,
+        detalle: `Firmada por ${employerName} (${employerPosition})`,
+        destacada: true,
+      });
+
+      return pdf;
     }
 
     const docDefinition = employementLetterReportByID({

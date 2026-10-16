@@ -246,6 +246,8 @@ export class EmpleadosController {
   }
 
   @Get('Constancia-Empleado/:id')
+  @Auth()
+  @ApiBearerAuth()
   @ApiOperation({
     summary:
       'Descargar constancia de trabajo en formato PDF. Opcional: ?month=YYYY-MM para incluir actividades del mes.',
