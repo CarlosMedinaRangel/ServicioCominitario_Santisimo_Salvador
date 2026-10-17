@@ -94,58 +94,66 @@ export class SeedService {
     await this.employeeRepository.save(elena);
 
     // Elena's schedules
-    const elenaSchedules = this.scheduleRepository.create([
-      {
-        employeeId: elena.userId,
-        nombre: 'Biología Molecular III',
-        aula: 'Lab 402',
-        horaInicio: '09:00',
-        horaFin: '11:30',
-        dia: 'Lunes',
-        icono: 'flask',
-        activa: true,
-      },
-      {
-        employeeId: elena.userId,
-        nombre: 'Bioética Avanzada',
-        aula: 'Aula 12B',
-        horaInicio: '14:00',
-        horaFin: '16:00',
-        dia: 'Martes',
-        icono: 'book',
-        activa: false,
-      },
-      {
-        employeeId: elena.userId,
-        nombre: 'Genética Aplicada',
-        aula: 'Lab 305',
-        horaInicio: '10:00',
-        horaFin: '12:30',
-        dia: 'Miércoles',
-        icono: 'dna',
-        activa: true,
-      },
-    ]);
+    const elenaSchedules = await this.scheduleRepository.save(
+      this.scheduleRepository.create([
+        {
+          employeeId: elena.userId,
+          nombre: 'Biología Molecular III',
+          aula: 'Lab 402',
+          horaInicio: '09:00',
+          horaFin: '11:30',
+          dias: ['Lunes'],
+          icono: 'flask',
+          activa: true,
+        },
+        {
+          employeeId: elena.userId,
+          nombre: 'Bioética Avanzada',
+          aula: 'Aula 12B',
+          horaInicio: '14:00',
+          horaFin: '16:00',
+          dias: ['Martes'],
+          icono: 'book',
+          activa: false,
+        },
+        {
+          employeeId: elena.userId,
+          nombre: 'Genética Aplicada',
+          aula: 'Lab 305',
+          horaInicio: '10:00',
+          horaFin: '12:30',
+          dias: ['Miércoles'],
+          icono: 'dna',
+          activa: true,
+        },
+      ]),
+    );
     await this.scheduleRepository.save(elenaSchedules);
+    const [biologia, bioetica, genetica] = elenaSchedules;
 
-    // Elena's groups
-    const elenaGroups = this.groupRepository.create([
-      {
-        employeeId: elena.userId,
-        nombre: 'Grupo A-1',
-        cantidadEstudiantes: 24,
-      },
-      {
-        employeeId: elena.userId,
-        nombre: 'Grupo B-4',
-        cantidadEstudiantes: 18,
-      },
-      {
-        employeeId: elena.userId,
-        nombre: 'Grupo C-2',
-        cantidadEstudiantes: 30,
-      },
-    ]);
+    // Elena's groups — cada uno vinculado a su schedule
+    const elenaGroups = await this.groupRepository.save(
+      this.groupRepository.create([
+        {
+          employeeId: elena.userId,
+          scheduleId: biologia.id,
+          nombre: 'Grupo A-1',
+          cantidadEstudiantes: 24,
+        },
+        {
+          employeeId: elena.userId,
+          scheduleId: bioetica.id,
+          nombre: 'Grupo B-4',
+          cantidadEstudiantes: 18,
+        },
+        {
+          employeeId: elena.userId,
+          scheduleId: genetica.id,
+          nombre: 'Grupo C-2',
+          cantidadEstudiantes: 30,
+        },
+      ]),
+    );
     await this.groupRepository.save(elenaGroups);
 
     // Elena's activities
@@ -204,43 +212,51 @@ export class SeedService {
     await this.employeeRepository.save(carlos);
 
     // Carlos's schedules
-    const carlosSchedules = this.scheduleRepository.create([
-      {
-        employeeId: carlos.userId,
-        nombre: 'Álgebra Lineal II',
-        aula: 'Aula 301',
-        horaInicio: '08:00',
-        horaFin: '10:00',
-        dia: 'Lunes',
-        icono: 'book',
-        activa: true,
-      },
-      {
-        employeeId: carlos.userId,
-        nombre: 'Cálculo Diferencial',
-        aula: 'Aula 302',
-        horaInicio: '10:30',
-        horaFin: '12:30',
-        dia: 'Miércoles',
-        icono: 'book',
-        activa: true,
-      },
-    ]);
+    const carlosSchedules = await this.scheduleRepository.save(
+      this.scheduleRepository.create([
+        {
+          employeeId: carlos.userId,
+          nombre: 'Álgebra Lineal II',
+          aula: 'Aula 301',
+          horaInicio: '08:00',
+          horaFin: '10:00',
+          dias: ['Lunes'],
+          icono: 'book',
+          activa: true,
+        },
+        {
+          employeeId: carlos.userId,
+          nombre: 'Cálculo Diferencial',
+          aula: 'Aula 302',
+          horaInicio: '10:30',
+          horaFin: '12:30',
+          dias: ['Miércoles'],
+          icono: 'book',
+          activa: true,
+        },
+      ]),
+    );
+
+    const [algebra, calculo] = carlosSchedules;
     await this.scheduleRepository.save(carlosSchedules);
 
     // Carlos's groups
-    const carlosGroups = this.groupRepository.create([
-      {
-        employeeId: carlos.userId,
-        nombre: 'Grupo D-1',
-        cantidadEstudiantes: 20,
-      },
-      {
-        employeeId: carlos.userId,
-        nombre: 'Grupo E-3',
-        cantidadEstudiantes: 15,
-      },
-    ]);
+    const carlosGroups = await this.groupRepository.save(
+      this.groupRepository.create([
+        {
+          employeeId: carlos.userId,
+          scheduleId: algebra.id,
+          nombre: 'Grupo D-1',
+          cantidadEstudiantes: 20,
+        },
+        {
+          employeeId: carlos.userId,
+          scheduleId: calculo.id,
+          nombre: 'Grupo E-3',
+          cantidadEstudiantes: 15,
+        },
+      ]),
+    );
     await this.groupRepository.save(carlosGroups);
 
     // Carlos's activities
@@ -290,28 +306,35 @@ export class SeedService {
     await this.employeeRepository.save(ana);
 
     // Ana's schedule
-    const anaSchedules = this.scheduleRepository.create([
-      {
-        employeeId: ana.userId,
-        nombre: 'Orientación Académica',
-        aula: 'Oficina 101',
-        horaInicio: '09:00',
-        horaFin: '11:00',
-        dia: 'Jueves',
-        icono: 'book',
-        activa: true,
-      },
-    ]);
+    const anaSchedules = await this.scheduleRepository.save(
+      this.scheduleRepository.create([
+        {
+          employeeId: ana.userId,
+          nombre: 'Orientación Académica',
+          aula: 'Oficina 101',
+          horaInicio: '09:00',
+          horaFin: '11:00',
+          dias: ['Jueves'],
+          icono: 'book',
+          activa: true,
+        },
+      ]),
+    );
+
+    const [orientacion] = anaSchedules;
     await this.scheduleRepository.save(anaSchedules);
 
     // Ana's groups
-    const anaGroups = this.groupRepository.create([
-      {
-        employeeId: ana.userId,
-        nombre: 'Grupo F-2',
-        cantidadEstudiantes: 12,
-      },
-    ]);
+    const anaGroups = await this.groupRepository.save(
+      this.groupRepository.create([
+        {
+          employeeId: ana.userId,
+          scheduleId: orientacion.id,
+          nombre: 'Grupo F-2',
+          cantidadEstudiantes: 12,
+        },
+      ]),
+    );
     await this.groupRepository.save(anaGroups);
 
     // Ana's activities

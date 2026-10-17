@@ -1,66 +1,47 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import {
-  IsDate,
-  IsNumber,
+  IsArray,
+  IsInt,
   IsOptional,
-  IsPositive,
   IsString,
   IsUUID,
-  MinLength,
+  Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ScheduleWithGroupsDto } from './schedule-with-groups.dto';
 
 export class CreateEmpleadoDto {
-  @ApiProperty({
-    example: '550e8400-e29b-41d4-a716-446655440000',
-    description: 'UUID del usuario al que pertenece este empleado',
-  })
-  @IsString()
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   @IsUUID()
   userId!: string;
 
-  @ApiProperty({
-    example: 'Desarrollador Backend',
-    description: 'Cargo o posición que ocupará el empleado en la empresa',
-  })
+  @ApiProperty({ example: 'Docente de Biología' })
   @IsString()
-  @MinLength(1)
   position!: string;
 
-  @ApiProperty({
-    example: '2024-01-15',
-    description: 'Fecha de inicio laboral del empleado (YYYY-MM-DD)',
-    type: String,
-    format: 'date',
-  })
-  @IsDate()
-  @Type(() => Date)
+  @ApiProperty({ example: '2024-01-15' })
+  @IsString()
   start_date!: string;
 
-  @ApiProperty({
-    example: '09:00',
-    description: 'Hora de entrada del empleado',
-  })
+  @ApiProperty({ example: '08:00' })
   @IsString()
-  @MinLength(1)
   work_time!: string;
 
-  @ApiProperty({
-    example: 8,
-    description: 'Cantidad de horas laborales que cumple el empleado al día',
-  })
-  @IsNumber()
-  @IsPositive()
-  @IsOptional()
+  @ApiProperty({ example: 8 })
+  @IsInt()
+  @Min(1)
   hours_per_day!: number;
 
-  @ApiProperty({
-    example: 'Lunes a Viernes, 9am - 5pm',
-    description: 'Horario laboral detallado del empleado',
-  })
+  @ApiProperty({ example: 'Lunes a Viernes, 8am - 4pm' })
   @IsString()
-  @MinLength(1)
   work_schedule!: string;
 
-
+  // Cada schedule lleva sus propios grupos adentro
+  @ApiProperty({ type: [ScheduleWithGroupsDto], required: false })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ScheduleWithGroupsDto)
+  schedules?: ScheduleWithGroupsDto[];
 }

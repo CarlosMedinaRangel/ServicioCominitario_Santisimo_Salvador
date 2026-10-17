@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentVerification } from './entities/document-verification.entity';
 import { DocumentsService } from './documents.service';
@@ -9,7 +9,7 @@ import { User } from '../auth/entities/auth.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([DocumentVerification, User]),
-    AuthModule,
+    forwardRef(() => AuthModule),
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService],

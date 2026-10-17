@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Patch,
+  Param,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
@@ -96,11 +97,18 @@ export class AuthController {
     let secureUrl: string | undefined;
     let publicId: string | undefined;
     if (file) {
-      const uploaded = await this.cloudinaryService.uploadFile(file, 'usuarios');
+      const uploaded = await this.cloudinaryService.uploadFile(
+        file,
+        'usuarios',
+      );
       secureUrl = uploaded.secureUrl;
       publicId = uploaded.publicId;
     }
-    const result = await this.authService.create(secureUrl, publicId, createUserDto);
+    const result = await this.authService.create(
+      secureUrl,
+      publicId,
+      createUserDto,
+    );
     return result;
   }
 
@@ -195,8 +203,8 @@ export class AuthController {
     return this.authService.checkAuthStatus(user);
   }
 
-  @Patch('update-profile')
-  @Auth()
+  @Patch('update-profile/:id')
+  @Auth(ValidRoles.admin)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -205,8 +213,48 @@ export class AuthController {
     }),
   )
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Actualizar perfil del usuario autenticado' })
-  async updateProfile(
+  @ApiOperation({
+    summary: 'Admin: actualizar perfil de cualquier usuario por ID',
+  })
+  async updateProfileById(
+    @GetUser() requestingUser: User, // ← quien hace la petición
+    @Param('id') userId: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    let secureUrl: string | undefined;
+    let publicId: string | undefined;
+
+    if (file) {
+      const uploaded = await this.cloudinaryService.uploadFile(
+        file,
+        'usuarios',
+      );
+      secureUrl = uploaded.secureUrl;
+      publicId = uploaded.publicId;
+    }
+
+    return this.authService.update(
+      userId,
+      secureUrl,
+      publicId,
+      updateUserDto,
+      requestingUser,
+    );
+  }
+
+  @Patch('update-profile')
+  @Auth() // cualquier usuario autenticado, sin rol
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      fileFilter: imageFileFilter,
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Actualizar mi propio perfil' })
+  async updateMyProfile(
     @GetUser() user: User,
     @Body() updateUserDto: UpdateUserDto,
     @UploadedFile() file?: Express.Multer.File,
@@ -223,6 +271,12 @@ export class AuthController {
       publicId = uploaded.publicId;
     }
 
-    return this.authService.update(user.id, secureUrl, publicId, updateUserDto);
+    return this.authService.update(
+      user.id,
+      secureUrl,
+      publicId,
+      updateUserDto,
+      user,
+    );
   }
 }

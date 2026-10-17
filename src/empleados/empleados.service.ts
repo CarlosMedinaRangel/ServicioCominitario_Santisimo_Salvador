@@ -8,7 +8,7 @@ import {
 import { CreateEmpleadoDto } from './dto/create-empleado.dto';
 import { UpdateEmpleadoDto } from './dto/update-empleado.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, DataSource, In } from 'typeorm';
 import { Employee } from './entities/employee.entity';
 import { Schedule } from './entities/schedule.entity';
 import { Group } from './entities/group.entity';
@@ -23,6 +23,10 @@ import { DocumentType, RecipientType } from 'src/documents/entities/document-ver
 import { CryptoService } from 'src/crypto/crypto.service';
 import * as bcrypt from 'bcrypt';
 import * as XLSX from 'xlsx';
+import {
+  ActivityService,
+  LogActivityInput,
+} from './activity-service/activity-service.service';
 
 export interface UploadError {
   row: number;
@@ -55,19 +59,24 @@ export class EmpleadosService {
     private readonly PrinterService: PrinterService,
     private readonly documentsService: DocumentsService,
     private readonly cryptoService: CryptoService,
+    private readonly dataSource: DataSource,
+    private readonly activityService: ActivityService,
   ) {}
 
   async create(createEmpleadoDto: CreateEmpleadoDto) {
-    try {
-      const user = await this.userRepository.findOneBy({
-        id: createEmpleadoDto.userId,
-      });
-      if (!user) {
-        throw new BadRequestException(
-          `No existe un usuario con id ${createEmpleadoDto.userId}`,
-        );
-      }
-      const employee = this.employeeRepository.create({
+    const user = await this.userRepository.findOneBy({
+      id: createEmpleadoDto.userId,
+    });
+
+    if (!user) {
+      throw new BadRequestException(
+        `No existe un usuario con id ${createEmpleadoDto.userId}`,
+      );
+    }
+
+    return await this.dataSource.transaction(async (manager) => {
+      // 1. Crear el empleado
+      const employee = manager.create(Employee, {
         userId: user.id,
         position: createEmpleadoDto.position,
         start_date: new Date(createEmpleadoDto.start_date),
@@ -75,14 +84,42 @@ export class EmpleadosService {
         hours_per_day: createEmpleadoDto.hours_per_day,
         work_schedule: createEmpleadoDto.work_schedule,
       });
-      await this.employeeRepository.save(employee);
-      return this.employeeRepository.findOne({
+      await manager.save(employee);
+
+      if (createEmpleadoDto.schedules?.length) {
+        for (const scheduleDto of createEmpleadoDto.schedules) {
+          const { groups, ...scheduleData } = scheduleDto;
+
+          const schedule = manager.create(Schedule, {
+            ...scheduleData,
+            employeeId: employee.userId,
+          });
+          await manager.save(schedule);
+
+          if (groups?.length) {
+            const newGroups = manager.create(
+              Group,
+              groups.map((g) => ({
+                ...g,
+                employeeId: employee.userId,
+                scheduleId: schedule.id,
+              })),
+            );
+            await manager.save(newGroups);
+          }
+        }
+      }
+
+      return manager.findOne(Employee, {
         where: { userId: employee.userId },
-        relations: { user: true },
+        relations: {
+          user: true,
+          schedules: {
+            groups: true,
+          },
+        },
       });
-    } catch (error: any) {
-      this.handleExceptions(error);
-    }
+    });
   }
 
   async findAll(status?: string) {
@@ -106,11 +143,17 @@ export class EmpleadosService {
     let employee: Employee | null = null;
 
     // Try UUID format (userId)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (uuidRegex.test(id)) {
       employee = await this.employeeRepository.findOne({
         where: { userId: id },
-        relations: { user: true },
+        relations: {
+          user: true,
+          schedules: {
+            groups: true,
+          },
+        },
       });
     }
 
@@ -120,11 +163,18 @@ export class EmpleadosService {
       if (!cedulaLimpia.startsWith('V')) {
         cedulaLimpia = 'V' + cedulaLimpia;
       }
-      const user = await this.userRepository.findOneBy({ cedula: cedulaLimpia });
+      const user = await this.userRepository.findOneBy({
+        cedula: cedulaLimpia,
+      });
       if (user) {
         employee = await this.employeeRepository.findOne({
           where: { userId: user.id },
-          relations: { user: true },
+          relations: {
+            user: true,
+            schedules: {
+              groups: true,
+            },
+          },
         });
       }
     }
@@ -151,7 +201,7 @@ export class EmpleadosService {
   async findSchedules(employeeId: string) {
     return this.scheduleRepository.find({
       where: { employeeId },
-      order: { dia: 'ASC', horaInicio: 'ASC' },
+      order: { dias: 'ASC', horaInicio: 'ASC' },
     });
   }
 
@@ -168,7 +218,15 @@ export class EmpleadosService {
     });
   }
 
-  async ConstanciaEmpleadoByID(id: string, options?: { month?: string; employerName?: string; employerPosition?: string; employerCompany?: string }) {
+  async ConstanciaEmpleadoByID(
+    id: string,
+    options?: {
+      month?: string;
+      employerName?: string;
+      employerPosition?: string;
+      employerCompany?: string;
+    },
+  ) {
     const employee = await this.findOne(id);
     const user = employee.user;
 
@@ -232,7 +290,15 @@ export class EmpleadosService {
         })),
       });
 
-      return this.PrinterService.createPdf(docDefinition);
+      const pdf = this.PrinterService.createPdf(docDefinition);
+      void this.activityService.log(employee.userId, {
+        tipo: 'Constancia Generada',
+        descripcion: `Constancia mensual de ${monthStr}-${yearStr}`,
+        detalle: `Firmada por ${employerName} (${employerPosition})`,
+        destacada: true,
+      });
+
+      return pdf;
     }
 
     const docDefinition = employementLetterReportByID({
@@ -249,32 +315,218 @@ export class EmpleadosService {
       verificationId: docRecord.id,
     });
 
-    return this.PrinterService.createPdf(docDefinition);
+    const pdf = this.PrinterService.createPdf(docDefinition);
+    void this.activityService.log(employee.userId, {
+      tipo: 'Constancia Generada',
+      descripcion: 'Constancia de trabajo',
+      detalle: `Firmada por ${employerName} (${employerPosition})`,
+      destacada: true,
+    });
+
+    return pdf;
   }
 
   async update(id: string, updateEmpleadoDto: UpdateEmpleadoDto) {
     const employee = await this.findOne(id);
+    const activities: LogActivityInput[] = [];
 
-    const updated = await this.employeeRepository.preload({
-      userId: employee.userId,
-      ...updateEmpleadoDto,
+    const result = await this.dataSource.transaction(async (manager) => {
+      await manager.update(
+        Employee,
+        { userId: employee.userId },
+        {
+          ...(updateEmpleadoDto.position && {
+            position: updateEmpleadoDto.position,
+          }),
+          ...(updateEmpleadoDto.start_date && {
+            start_date: new Date(updateEmpleadoDto.start_date),
+          }),
+          ...(updateEmpleadoDto.work_time && {
+            work_time: updateEmpleadoDto.work_time,
+          }),
+          ...(updateEmpleadoDto.hours_per_day !== undefined && {
+            hours_per_day: updateEmpleadoDto.hours_per_day,
+          }),
+          ...(updateEmpleadoDto.work_schedule && {
+            work_schedule: updateEmpleadoDto.work_schedule,
+          }),
+        },
+      );
+      if (
+        updateEmpleadoDto.position &&
+        updateEmpleadoDto.position !== employee.position
+      ) {
+        activities.push({
+          tipo: 'Actualización Laboral',
+          descripcion: 'Cargo actualizado',
+          detalle: `Cargo cambiado a "${updateEmpleadoDto.position}"`,
+        });
+      }
+
+      if (
+        updateEmpleadoDto.work_schedule &&
+        updateEmpleadoDto.work_schedule !== employee.work_schedule
+      ) {
+        activities.push({
+          tipo: 'Actualización Laboral',
+          descripcion: 'Horario laboral actualizado',
+          detalle: `Nuevo horario: ${updateEmpleadoDto.work_schedule}`,
+        });
+      }
+
+      if (
+        updateEmpleadoDto.hours_per_day !== undefined &&
+        updateEmpleadoDto.hours_per_day !== employee.hours_per_day
+      ) {
+        activities.push({
+          tipo: 'Actualización Laboral',
+          descripcion: 'Horas por día actualizadas',
+          detalle: `Horas cambiadas a ${updateEmpleadoDto.hours_per_day}h/día`,
+        });
+      }
+
+      if (updateEmpleadoDto.schedules !== undefined) {
+        const existingSchedules = await manager.find(Schedule, {
+          where: { employeeId: employee.userId },
+        });
+
+        const incomingIds = updateEmpleadoDto.schedules
+          .filter((s) => s.id)
+          .map((s) => s.id!);
+
+        const toDelete = existingSchedules.filter(
+          (s) => !incomingIds.includes(s.id),
+        );
+
+        if (toDelete.length) {
+          const scheduleIds = toDelete.map((s) => s.id);
+
+          for (const s of toDelete) {
+            activities.push({
+              tipo: 'Materia Eliminada',
+              descripcion: s.nombre,
+              detalle: `Aula: ${s.aula}`,
+            });
+          }
+          await manager.delete(Group, { scheduleId: In(scheduleIds) });
+          await manager.delete(Schedule, { id: In(scheduleIds) });
+        }
+
+        for (const scheduleDto of updateEmpleadoDto.schedules) {
+          const { groups, id: scheduleId, ...scheduleData } = scheduleDto;
+
+          let schedule: Schedule;
+
+          if (scheduleId) {
+            await manager.update(
+              Schedule,
+              { id: scheduleId },
+              {
+                ...scheduleData,
+                employeeId: employee.userId,
+              },
+            );
+            schedule = (await manager.findOne(Schedule, {
+              where: { id: scheduleId },
+            }))!;
+          } else {
+            schedule = manager.create(Schedule, {
+              ...scheduleData,
+              employeeId: employee.userId,
+            });
+            activities.push({
+              tipo: 'Nueva Materia',
+              descripcion: scheduleDto?.nombre ?? '',
+              detalle: `Aula: ${scheduleDto.aula}`,
+              destacada: true,
+            });
+            await manager.save(schedule);
+          }
+
+          if (groups !== undefined) {
+            const existingGroups = await manager.find(Group, {
+              where: { scheduleId: schedule.id },
+            });
+
+            const incomingGroupIds = groups
+              .filter((g) => g.id)
+              .map((g) => g.id!);
+
+            const groupsToDelete = existingGroups.filter(
+              (g) => !incomingGroupIds.includes(g.id),
+            );
+
+            // ← aquí va, usando groupsToDelete (no toDelete)
+            if (groupsToDelete.length) {
+              for (const g of groupsToDelete) {
+                activities.push({
+                  tipo: 'Grupo Eliminado',
+                  descripcion: g.nombre,
+                  detalle: `${g.cantidadEstudiantes} estudiantes`,
+                });
+              }
+              await manager.delete(Group, {
+                id: In(groupsToDelete.map((g) => g.id)),
+              });
+            }
+
+            for (const groupDto of groups) {
+              const { id: groupId, ...groupData } = groupDto;
+
+              if (groupId) {
+                await manager.update(
+                  Group,
+                  { id: groupId },
+                  {
+                    ...groupData,
+                    employeeId: employee.userId,
+                    scheduleId: schedule.id,
+                  },
+                );
+              } else {
+                const newGroup = manager.create(Group, {
+                  ...groupData,
+                  employeeId: employee.userId,
+                  scheduleId: schedule.id,
+                });
+                activities.push({
+                  tipo: 'Nuevo Grupo',
+                  descripcion: groupDto.nombre ?? '',
+                  detalle: `${groupDto.cantidadEstudiantes} estudiantes`,
+                  destacada: false,
+                });
+                await manager.save(newGroup);
+              }
+            }
+          }
+        }
+      }
+
+      return manager.findOne(Employee, {
+        where: { userId: employee.userId },
+        relations: {
+          user: true,
+          schedules: { groups: true },
+        },
+      });
     });
 
-    if (!updated) {
-      throw new NotFoundException(
-        `El empleado con el id ${id} no se encontró`,
-      );
+    void this.activityService.logMany(employee.userId, activities);
+    return result;
+  }
+
+  async updateByUserId(userId: string, dto: UpdateEmpleadoDto) {
+    const employee = await this.employeeRepository.findOne({
+      where: { userId },
+      relations: { schedules: true, groups: true },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('No tienes datos de empleado registrados');
     }
 
-    try {
-      const result = await this.employeeRepository.save(updated);
-      return this.employeeRepository.findOne({
-        where: { userId: result.userId },
-        relations: { user: true },
-      });
-    } catch (error: any) {
-      this.handleExceptions(error);
-    }
+    // Reutiliza el método update existente con el id real del empleado
+    return this.update(employee.userId, dto);
   }
 
   async remove(id: string) {
@@ -321,14 +573,21 @@ export class EmpleadosService {
     file: Express.Multer.File,
     mapping: Record<string, number>,
   ): Promise<UploadResult> {
-    const workbook = XLSX.read(file.buffer, { type: 'buffer', cellDates: true });
+    const workbook = XLSX.read(file.buffer, {
+      type: 'buffer',
+      cellDates: true,
+    });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+    const jsonData = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+    }) as unknown[][];
 
     const rows = jsonData
       .slice(1)
-      .filter((r) => r.some((cell) => cell !== undefined && cell !== null && cell !== ''));
+      .filter((r) =>
+        r.some((cell) => cell !== undefined && cell !== null && cell !== ''),
+      );
 
     let created = 0;
     let updated = 0;
@@ -341,6 +600,7 @@ export class EmpleadosService {
       try {
         const data = this.extractRowData(row, mapping);
 
+        // El upload identifica empleados por cédula (o email si lo incluyeron)
         if (!data.email && !data.cedula) {
           errors.push({
             row: rowNum,
@@ -350,24 +610,27 @@ export class EmpleadosService {
           continue;
         }
 
-        // Find or create user
+        // ── Buscar o crear usuario ────────────────────────────────────────────
         let user: User | null = null;
+
         if (data.email) {
           user = await this.userRepository.findOneBy({
             email: String(data.email).toLowerCase().trim(),
           });
         }
         if (!user && data.cedula) {
-          let cedulaLookup = String(data.cedula).replace(/\./g, '').toUpperCase();
+          let cedulaLookup = String(data.cedula)
+            .replace(/\./g, '')
+            .toUpperCase();
           if (!cedulaLookup.startsWith('V')) cedulaLookup = 'V' + cedulaLookup;
           user = await this.userRepository.findOneBy({ cedula: cedulaLookup });
         }
 
         if (user) {
-          // Update existing user
           const userUpdates: Partial<User> = {};
           if (data.fullName) userUpdates.fullName = String(data.fullName);
-          if (data.email) userUpdates.email = String(data.email).toLowerCase().trim();
+          if (data.email)
+            userUpdates.email = String(data.email).toLowerCase().trim();
           if (data.cedula) {
             let c = String(data.cedula).replace(/\./g, '').toUpperCase();
             if (!c.startsWith('V')) c = 'V' + c;
@@ -377,7 +640,6 @@ export class EmpleadosService {
             userUpdates.telefono = String(data.telefono).replace(/\D/g, '');
           await this.userRepository.save({ ...user, ...userUpdates });
         } else {
-          // Create new user
           const password = data.password
             ? String(data.password)
             : `${data.cedula || 'Default'}123!`;
@@ -399,7 +661,9 @@ export class EmpleadosService {
           user = await this.userRepository.save(user);
         }
 
-        // Find or create employee
+        // ── Buscar o crear empleado (solo datos base) ─────────────────────────
+        // El upload masivo NO crea schedules ni groups — esos se asignan
+        // después desde el formulario individual, donde tienen sentido anidados.
         let employee = await this.employeeRepository.findOneBy({
           userId: user.id,
         });
@@ -409,7 +673,9 @@ export class EmpleadosService {
           start_date: data.start_date
             ? new Date(this.formatDateValue(data.start_date))
             : new Date(),
-          work_time: data.work_time ? String(data.work_time) : '08:00:00',
+          work_time: data.work_time
+            ? this.normalizeTime(String(data.work_time))
+            : '08:00',
           hours_per_day: data.hours_per_day ? Number(data.hours_per_day) : 8,
           work_schedule: data.work_schedule
             ? String(data.work_schedule)
@@ -443,6 +709,8 @@ export class EmpleadosService {
     return { success: errors.length === 0, created, updated, errors };
   }
 
+  // ── Helpers privados ──────────────────────────────────────────────────────
+
   private extractRowData(
     row: unknown[],
     mapping: Record<string, number>,
@@ -457,9 +725,7 @@ export class EmpleadosService {
   }
 
   private formatDateValue(value: unknown): string {
-    if (value instanceof Date) {
-      return value.toISOString().split('T')[0];
-    }
+    if (value instanceof Date) return value.toISOString().split('T')[0];
     if (typeof value === 'number') {
       const date = XLSX.SSF?.parse_date_code?.(value);
       if (date?.y && date?.m && date?.d) {
@@ -468,12 +734,16 @@ export class EmpleadosService {
     }
     if (typeof value === 'string') {
       const parsed = new Date(value);
-      if (!isNaN(parsed.getTime())) {
-        return parsed.toISOString().split('T')[0];
-      }
+      if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
       return value;
     }
     return '';
+  }
+
+  private normalizeTime(value: string): string {
+    const match = value.match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return value;
+    return `${match[1].padStart(2, '0')}:${match[2]}`;
   }
 
   async seedActivities(employeeId: string, month: string) {
@@ -484,17 +754,33 @@ export class EmpleadosService {
     const mes = parseInt(monthStr, 10);
 
     const activityTypes = [
-      'Clase Impartida', 'Reunión', 'Corrección de Evaluaciones',
-      'Planificación', 'Laboratorio', 'Tutoría',
+      'Clase Impartida',
+      'Reunión',
+      'Corrección de Evaluaciones',
+      'Planificación',
+      'Laboratorio',
+      'Tutoría',
     ];
     const descriptions = [
-      'Matemáticas Básicas', 'Biología Molecular', 'Historia Universal',
-      'Lengua y Literatura', 'Física General', 'Química Orgánica',
-      'Inglés Avanzado', 'Educación Física', 'Arte y Cultura',
+      'Matemáticas Básicas',
+      'Biología Molecular',
+      'Historia Universal',
+      'Lengua y Literatura',
+      'Física General',
+      'Química Orgánica',
+      'Inglés Avanzado',
+      'Educación Física',
+      'Arte y Cultura',
     ];
     const details = [
-      'Grupo A', 'Grupo B', 'Grupo C', 'Salón 101', 'Salón 203',
-      'Laboratorio 1', 'Aula Virtual', 'Biblioteca',
+      'Grupo A',
+      'Grupo B',
+      'Grupo C',
+      'Salón 101',
+      'Salón 203',
+      'Laboratorio 1',
+      'Aula Virtual',
+      'Biblioteca',
     ];
 
     const activities: Activity[] = [];
@@ -505,8 +791,10 @@ export class EmpleadosService {
       const hour = 7 + Math.floor(Math.random() * 10);
       const timestamp = new Date(year, mes - 1, day, hour, 0, 0);
 
-      const tipo = activityTypes[Math.floor(Math.random() * activityTypes.length)];
-      const descripcion = descriptions[Math.floor(Math.random() * descriptions.length)];
+      const tipo =
+        activityTypes[Math.floor(Math.random() * activityTypes.length)];
+      const descripcion =
+        descriptions[Math.floor(Math.random() * descriptions.length)];
       const detalle = details[Math.floor(Math.random() * details.length)];
 
       const activity = this.activityRepository.create({

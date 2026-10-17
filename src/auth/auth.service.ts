@@ -20,6 +20,11 @@ import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { TurnstileService } from './services/turnstile.service';
 import { UpdateUserDto } from './dto/update-auth.dto';
 import { CryptoService } from 'src/crypto/crypto.service';
+import { ValidRoles } from './interfaces/valid-roles';
+import {
+  ActivityService,
+  LogActivityInput,
+} from 'src/empleados/activity-service/activity-service.service';
 
 @Injectable()
 export class AuthService {
@@ -30,6 +35,7 @@ export class AuthService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly turnstileService: TurnstileService,
     private readonly cryptoService: CryptoService,
+    private readonly activityService: ActivityService,
   ) {}
 
   async create(secureUrl, publicId, CreateUserDto: CreateUserDto) {
@@ -228,31 +234,111 @@ export class AuthService {
     secureUrl: string | undefined,
     publicId: string | undefined,
     updateUserDto: UpdateUserDto,
+    requestingUser?: User, // ← usuario autenticado
   ) {
-    const userActual = await this.userRepository.findOneBy({ id: userId });
+    const isAdmin = requestingUser?.roles?.includes(ValidRoles.admin) ?? false;
 
-    if (!userActual) {
-      throw new UnauthorizedException('Usuario no encontrado');
-    }
+    const { currentPassword, newPassword, removePhoto, ...profileData } =
+      updateUserDto;
 
-    // Borra imagen anterior si viene una nueva
-    if (secureUrl && userActual.publicId) {
-      await this.cloudinaryService.deleteFile(userActual.publicId);
-    }
-
-    const user = await this.userRepository.preload({
-      id: userId,
-      ...updateUserDto,
-      ...(secureUrl ? { imagen: secureUrl, publicId } : {}),
+    const userActual = await this.userRepository.findOne({
+      where: { id: userId },
+      select: {
+        id: true,
+        password: true,
+        publicId: true,
+        fullName: true,
+        email: true,
+      },
     });
 
-    if (!user) {
-      throw new UnauthorizedException('Usuario no encontrado');
+    if (!userActual) throw new UnauthorizedException('Usuario no encontrado');
+
+    const activities: LogActivityInput[] = [];
+
+    if (profileData.fullName && profileData.fullName !== userActual.fullName) {
+      activities.push({
+        tipo: 'Actualización de Perfil',
+        descripcion: 'Nombre actualizado',
+        detalle: `Nombre cambiado a "${profileData.fullName}"`,
+      });
     }
+
+    if (profileData.email && profileData.email !== userActual.email) {
+      activities.push({
+        tipo: 'Actualización de Perfil',
+        descripcion: 'Correo actualizado',
+        detalle: `Correo cambiado a "${profileData.email}"`,
+      });
+    }
+
+    if (newPassword) {
+      activities.push({
+        tipo: 'Cambio de Contraseña',
+        descripcion: 'Contraseña actualizada',
+        detalle: isAdmin
+          ? 'Contraseña restablecida por un administrador'
+          : 'El empleado cambió su contraseña',
+        destacada: true,
+      });
+    }
+
+    if (secureUrl) {
+      activities.push({
+        tipo: 'Actualización de Perfil',
+        descripcion: 'Foto de perfil actualizada',
+        detalle: 'Nueva foto de perfil subida',
+      });
+    }
+
+    if (removePhoto) {
+      activities.push({
+        tipo: 'Actualización de Perfil',
+        descripcion: 'Foto de perfil eliminada',
+        detalle: 'Foto de perfil removida',
+      });
+    }
+
+    // ── Contraseña ────────────────────────────────────────────────────────
+    if (newPassword) {
+      if (isAdmin) {
+        // Admin verificado por roles reales: resetea sin pedir la actual
+      } else if (!currentPassword) {
+        throw new BadRequestException(
+          'Debes proporcionar la contraseña actual para poder cambiarla',
+        );
+      } else if (!bcrypt.compareSync(currentPassword, userActual.password)) {
+        throw new UnauthorizedException('La contraseña actual es incorrecta');
+      }
+    }
+
+    // ── Foto ──────────────────────────────────────────────────────────────
+    let imagenUpdate:
+      { imagen: string | null; publicId: string | null } | undefined;
+
+    if (secureUrl) {
+      if (userActual.publicId)
+        await this.cloudinaryService.deleteFile(userActual.publicId);
+      imagenUpdate = { imagen: secureUrl, publicId: publicId! };
+    } else if (removePhoto && userActual.publicId) {
+      await this.cloudinaryService.deleteFile(userActual.publicId);
+      imagenUpdate = { imagen: null, publicId: null };
+    }
+
+    const hashedPassword = newPassword ? await bcrypt.hash(newPassword, 10) : undefined;
+    const user = await this.userRepository.preload({
+      id: userId,
+      ...profileData,
+      ...imagenUpdate,
+      ...(hashedPassword ? { password: hashedPassword } : {}),
+    });
+
+    if (!user) throw new UnauthorizedException('Usuario no encontrado');
 
     try {
       const result = await this.userRepository.save(user);
       const { password, ...userInfo } = result;
+      await this.activityService.logMany(userId, activities);
       return userInfo;
     } catch (error: any) {
       this.handleDBErrors(error);

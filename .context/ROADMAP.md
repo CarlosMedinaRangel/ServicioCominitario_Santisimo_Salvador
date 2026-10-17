@@ -158,5 +158,6 @@
 - Worker threads for Excel parsing
 - Streaming XLSX import for large files
 - Employee career history table
+- Monthly activities breakdown table in constancia report (Protected in `src/reports/constanciaMensual.report.ts` via `AI_PRESERVE_FEATURE` until historical activity recording is fully standardized)
 - Academic period management
 - Payroll receipts module

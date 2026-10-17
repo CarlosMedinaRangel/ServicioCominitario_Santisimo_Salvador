@@ -71,9 +71,18 @@ interface MonthlyReportProps {
 }
 
 const monthsMap: Record<string, string> = {
-  '01': 'enero', '02': 'febrero', '03': 'marzo', '04': 'abril',
-  '05': 'mayo', '06': 'junio', '07': 'julio', '08': 'agosto',
-  '09': 'septiembre', '10': 'octubre', '11': 'noviembre', '12': 'diciembre',
+  '01': 'enero',
+  '02': 'febrero',
+  '03': 'marzo',
+  '04': 'abril',
+  '05': 'mayo',
+  '06': 'junio',
+  '07': 'julio',
+  '08': 'agosto',
+  '09': 'septiembre',
+  '10': 'octubre',
+  '11': 'noviembre',
+  '12': 'diciembre',
 };
 
 function formatMonth(monthStr: string): string {
@@ -136,10 +145,16 @@ export const constanciaMensualReport = (
           `, desempeñando el cargo de `,
           { text: `${employeePosition}`, bold: true },
           `, con una jornada de ${employeeHours} horas semanales, en horario de ${employeeWorkSchedule}.\n\n`,
-          `Durante el mes de ${formatMonth(month)}, el empleado realizó las siguientes actividades:`,
         ],
         style: 'body',
       },
+      /* =========================================================================
+       * AI_PRESERVE_FEATURE: Monthly Activities Breakdown Table
+       * DO NOT DELETE OR STRIP THIS COMMENT BLOCK.
+       * 
+       * Kept in reserve while historical monthly activity recording is being fully fledged out.
+       * When ready to display detailed monthly activity logs on the printed letter, uncomment this block:
+       *
       activities.length > 0
         ? {
             table: {
@@ -163,6 +178,7 @@ export const constanciaMensualReport = (
             italics: true,
             margin: [0, 5, 0, 15],
           },
+       * ========================================================================= */
       {
         text: 'Se expide la presente constancia a solicitud de la parte interesada para los fines que considere pertinentes.',
         style: 'body',
@@ -208,7 +224,7 @@ export const constanciaMensualReport = (
               }
             : { width: 0, text: '' },
         ],
-        margin: [0, 5, 0, 0],
+        margin: [0, 40, 0, 0],
       },
     ],
     footer: {

@@ -34,6 +34,8 @@ import { Auth } from 'src/auth/Decorators/auth.decorator';
 import { ValidRoles } from 'src/auth/interfaces';
 
 import 'multer';
+import { GetUser } from 'src/auth/Decorators/get-user.decorator';
+import { User } from 'src/auth/entities/auth.entity';
 
 @ApiTags('empleados')
 @Controller('empleados')
@@ -136,6 +138,21 @@ export class EmpleadosController {
     return this.empleadosService.uploadFile(file, mapping);
   }
 
+  @Patch('me')
+  @Auth() // cualquier usuario autenticado, sin rol
+  @ApiOperation({ summary: 'Actualizar mis propios datos de empleado' })
+  @ApiResponse({ status: 200, description: 'Datos actualizados correctamente' })
+  @ApiResponse({
+    status: 404,
+    description: 'No tienes datos de empleado registrados',
+  })
+  async updateMyEmployee(
+    @GetUser() user: User,
+    @Body() updateEmployeeDto: UpdateEmpleadoDto,
+  ) {
+    return this.empleadosService.updateByUserId(user.id, updateEmployeeDto);
+  }
+
   @Get()
   @Auth(ValidRoles.admin)
   @ApiBearerAuth()
@@ -235,6 +252,8 @@ export class EmpleadosController {
   }
 
   @Get('Constancia-Empleado/:id')
+  @Auth()
+  @ApiBearerAuth()
   @ApiOperation({
     summary:
       'Descargar constancia de trabajo en formato PDF. Opcional: ?month=YYYY-MM para incluir actividades del mes.',
