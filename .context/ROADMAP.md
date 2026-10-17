@@ -84,6 +84,7 @@
 |------|------|------------|
 | Employee Management | `.context/SPEC-employee-management.md` | Yes (backend + frontend) |
 | Document Generation | `.context/SPEC-document-generation.md` | Yes (backend + frontend) |
+| Backend Test Suite Inventory | `.context/TEST_SUITE_INVENTORY.md` | Backend (Jest/Supertest Reference) |
 
 **Rule:** Read the relevant SPEC file before implementing feature-related changes.
 
