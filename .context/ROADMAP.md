@@ -51,6 +51,8 @@
 | D-22 | RegisterAction in wrong layer | `fix-now` | Move to stores/actions |
 | D-23 | 4 QR libraries | `defer` | All kept (3 purposes) |
 | D-25 | Very new majors (React 19, Vite 8) | `monitor` | Watch for breakage |
+| D-31 | Missing backward navigation / return button in Edit Employee flow | `fix-now` | Add return controls in edit employee views |
+| D-32 | Comprehensive responsive design deficit: UI adapted solely for mobile, missing desktop & tablet adaptations across all pages | `fix-now` | Global platform views (`pages/`) |
 
 ---
 
@@ -101,6 +103,8 @@
 - [ ] Fix D-26: Add proper types for start_date
 - [ ] Fix D-30: Move Swagger to /docs
 - [ ] Fix D-08: Consolidate axios instances
+- [ ] Fix D-31: Add backward options/arrows in Edit Employee flow
+- [ ] Fix D-32: Adapt platform UI for desktop/tablet screens (currently mobile-only focused)
 - [ ] Bootstrap test infrastructure (Jest + Vitest)
 
 ### Phase 2: Architecture Cleanup
@@ -150,6 +154,8 @@
 | Date | Finding | Discovered In | Status |
 |------|---------|---------------|--------|
 | 2026-10-05 | Initial audit completed | overview.md | Logged |
+| 2026-10-19 | In Edit Employee, missing backward navigation options/arrows | Edit Employee Flow | Logged |
+| 2026-10-19 | Platform UI is currently adapted primarily for mobile only; desktop/tablet responsive layout needed | Global Frontend UI | Logged |
 
 ---
 

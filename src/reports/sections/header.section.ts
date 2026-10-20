@@ -13,8 +13,8 @@ const logo: Content = {
   image: 'src/assets/LogoSantisimoSalvador.png',
   width: 100,
   height: 100,
-  alignment: 'center',
-  margin: [0, 0, 0, 20],
+  alignment: 'left',
+  margin: [0, 0, 0, 10],
 };
 
 export const headerSection = (options: HeaderOptions): Content => {
@@ -25,7 +25,8 @@ export const headerSection = (options: HeaderOptions): Content => {
     ? {
         text: DateFormatter.getDDMMMMYYYY(new Date()),
         alignment: 'right',
-        margin: [0, 20, 0, 20],
+        fontSize: 10,
+        margin: [0, 10, 0, 0],
       }
     : '';
   return {

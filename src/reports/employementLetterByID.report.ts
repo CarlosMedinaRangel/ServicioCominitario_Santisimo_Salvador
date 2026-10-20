@@ -9,25 +9,19 @@ import { DocumentVerification } from 'src/documents/entities/document-verificati
 
 const styles: StyleDictionary = {
   header: {
-    fontSize: 22,
+    fontSize: 20,
     bold: true,
     alignment: 'center',
-    margin: [0, 40, 0, 35],
+    margin: [0, 25, 0, 25],
   },
   body: {
     alignment: 'justify',
-    margin: [0, 0, 0, 40],
-    lineHeight: 1.3,
+    lineHeight: 1.35,
+    fontSize: 11,
   },
   signature: {
-    fontSize: 12,
+    fontSize: 11,
     bold: true,
-  },
-  footer: {
-    fontSize: 9,
-    italics: true,
-    alignment: 'center',
-    margin: [0, 0, 0, 15],
   },
 };
 
@@ -64,7 +58,7 @@ export const employementLetterReportByID = (
 
   const docDefinition: TDocumentDefinitions = {
     styles: styles,
-    pageMargins: [40, 50, 40, 50],
+    pageMargins: [40, 40, 40, 40],
 
     header: headerSection({ showLogo: true, ShowDate: true }),
 
@@ -85,18 +79,27 @@ export const employementLetterReportByID = (
           { text: DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate)), bold: true },
           `, desempeñando el cargo de `,
           { text: employeePosition, bold: true },
-          `.\n\n`,
-          `La jornada laboral del Sr./Sra. ${employeeName} es de ${employeeHours} horas semanales, con un horario de ${employeeWorkSchedule}, cumpliendo a cabalidad con las políticas y procedimientos establecidos por la institución.\n\n`,
-          `Esta constancia se expide a solicitud de la parte interesada para los fines que considere convenientes.`,
+          `.`,
         ],
         style: 'body',
+        margin: [0, 0, 0, 16],
+      },
+      {
+        text: `La jornada laboral del Sr./Sra. ${employeeName} es de ${employeeHours} horas semanales, con un horario de ${employeeWorkSchedule}, cumpliendo a cabalidad con las políticas y procedimientos establecidos por la institución.`,
+        style: 'body',
+        margin: [0, 0, 0, 16],
+      },
+      {
+        text: `Esta constancia se expide a solicitud de la parte interesada para los fines que considere convenientes.`,
+        style: 'body',
+        margin: [0, 0, 0, 40],
       },
       {
         columns: [
           {
             width: '*',
             stack: [
-              { text: 'Atentamente,', style: 'signature', margin: [0, 0, 0, 15] },
+              { text: 'Atentamente,', style: 'signature', margin: [0, 0, 0, 16] },
               { text: employerName, style: 'signature' },
               { text: employerPosition, fontSize: 10, italics: true },
               { text: employerCompany, fontSize: 10 },
@@ -142,11 +145,6 @@ export const employementLetterReportByID = (
         margin: [0, 10, 0, 0],
       },
     ],
-
-    footer: {
-      text: 'Este documento cuenta con un sello digital de autenticidad criptográfica verificable en el sistema de Santísimo Salvador.',
-      style: 'footer',
-    },
   };
 
   return docDefinition;
