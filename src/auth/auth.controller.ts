@@ -12,7 +12,7 @@ import {
   Patch,
   Param,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto.user';
 import { LoginUserDto } from './dto/Login-user.dto';
@@ -134,7 +134,7 @@ export class AuthController {
   async LoginUser(
     @Body() LoginUserDto: LoginUserDto,
     @Res({ passthrough: true }) response: Response,
-    @Req() req: any,
+    @Req() req: Request,
   ) {
     const clientIp = req.ip || req.connection?.remoteAddress;
     const result = await this.authService.login(LoginUserDto, clientIp);

@@ -23,22 +23,22 @@
 |----|-------------|-----|-------|
 | D-01 | `synchronize: true` — no migrations | `prototype-ok` | Migrate to migrations before production |
 | D-02 | Default crypto secret fallback | `prototype-ok` | Set QR_SECRET_KEY in production env |
-| D-03 | JWT returned in JSON body + cookie | `fix-now` | Remove token from response body |
-| D-04 | Test/private routes in controller | `fix-now` | Remove `/private`, `/private2`, `/private3` |
+| D-03 | JWT returned in JSON body + cookie | `resolved` | Token stripped from response body (cookie only) |
+| D-04 | Test/private routes in controller | `resolved` | Removed /private* test routes from auth.controller |
 | D-05 | Seed/demo logic in production service | `prototype-ok` | Remove seedActivities before deploy |
 | D-07 | God service (empleados.service.ts, 530 lines) | `pre-student-blocker` | Split into 4 services |
 | D-09 | Orchestration + PDF entangled | `pre-student-blocker` | Extract ConstanciaService |
-| D-10 | `exports: [EmpleadosModule]` self-export | `fix-now` | Remove invalid export |
+| D-10 | `exports: [EmpleadosModule]` self-export | `resolved` | Cleaned exports array in EmpleadosModule |
 | D-11 | No unit tests (0 spec files) | `pre-student-blocker` | Add Jest tests |
 | D-12 | No migrations despite config | `prototype-ok` | Deferred until schema final |
 | D-13 | Misleading docs (explanation.md) | `fix-now` | Update or archive |
 | D-17 | Hardcoded defaults (employer names) | `remove-on-real-data` | Move to config/env |
 | D-20 | No Dockerfile | `fix-now` | Create for Render deploy |
-| D-26 | `as any` casts in start_date | `fix-now` | Add proper types |
+| D-26 | `as any` casts in start_date | `resolved` | Removed redundant casts in seed.service.ts |
 | D-27 | bcrypt.hashSync in request path | `pre-student-blocker` | Change to async |
 | D-28 | Excel upload N+1, no transaction | `pre-student-blocker` | Use QueryRunner transaction |
 | D-29 | No repository abstraction | `pre-student-blocker` | Create custom repositories |
-| D-30 | Swagger at /api conflicts | `fix-now` | Move to /docs |
+| D-30 | Swagger at /api conflicts | `resolved` | Mounted at /docs in main.ts |
 
 ---
 
@@ -46,7 +46,7 @@
 
 | ID | Description | Tag | Notes |
 |----|-------------|-----|-------|
-| D-08 | Dual axios instances | `fix-now` | Consolidate to services/api.ts |
+| D-08 | Dual axios instances | `resolved` | Centralized to src/api/client.ts |
 | D-21 | authStatus always "checking" on reload | `prototype-ok` | Acceptable UX for now |
 | D-22 | RegisterAction in wrong layer | `fix-now` | Move to stores/actions |
 | D-23 | 4 QR libraries | `defer` | All kept (3 purposes) |
@@ -96,13 +96,13 @@
 
 ### Phase 1: Core Stabilization (Current)
 
-- [ ] Fix D-03: Remove JWT from response body
-- [ ] Fix D-04: Remove test routes from controller
-- [ ] Fix D-10: Remove invalid module export
+- [x] Fix D-03: Remove JWT from response body
+- [x] Fix D-04: Remove test routes from controller
+- [x] Fix D-10: Remove invalid module export
 - [ ] Fix D-20: Create Dockerfile for backend
-- [ ] Fix D-26: Add proper types for start_date
-- [ ] Fix D-30: Move Swagger to /docs
-- [ ] Fix D-08: Consolidate axios instances
+- [x] Fix D-26: Add proper types for start_date (Removed redundant as any in seed.service.ts)
+- [x] Fix D-30: Move Swagger to /docs
+- [x] Fix D-08: Consolidate axios instances (Resolved in src/api/client.ts)
 - [ ] Fix D-31: Add backward options/arrows in Edit Employee flow
 - [ ] Fix D-32: Adapt platform UI for desktop/tablet screens (currently mobile-only focused)
 - [ ] Bootstrap test infrastructure (Jest + Vitest)
@@ -156,6 +156,8 @@
 | 2026-10-05 | Initial audit completed | overview.md | Logged |
 | 2026-10-19 | In Edit Employee, missing backward navigation options/arrows | Edit Employee Flow | Logged |
 | 2026-10-19 | Platform UI is currently adapted primarily for mobile only; desktop/tablet responsive layout needed | Global Frontend UI | Logged |
+| 2026-10-19 | Study fallback employer defaults (D-17): determine whether signatories should be directory/high-member staff or team members, and configure via env vars | Document Generation | To Study |
+| 2026-10-19 | Study constancia wording vs. DB schema: check whether employeeHours (Employee.hours_per_day) should say "horas diarias" or be calculated as "horas semanales" | Document Reports | To Study |
 
 ---
 

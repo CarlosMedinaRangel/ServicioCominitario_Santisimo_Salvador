@@ -126,7 +126,7 @@ export class CryptoService {
     payload: T,
     subType?: string,
   ): string;
-  encryptPayload(payload: any, subType: string = 'DOC'): string {
+  encryptPayload(payload: unknown, subType: string = 'DOC'): string {
     const iv = randomBytes(12); // Standard 12-byte IV for GCM
     const cipher = createCipheriv(this.algorithm, this.key, iv);
 
@@ -157,7 +157,7 @@ export class CryptoService {
     token: string,
     expectedSubType?: string,
   ): T;
-  decryptPayload(token: string, expectedSubType?: string): any {
+  decryptPayload<T = unknown>(token: string, expectedSubType?: string): T {
     const header = this.inspectToken(token);
 
     if (!header.isValidHeader) {
@@ -221,14 +221,14 @@ export class CryptoService {
         decipher.update(ciphertext),
         decipher.final(),
       ]);
-    } catch (err: any) {
+    } catch {
       throw new BadRequestException(
         'Sello digital adulterado o falsificado: La firma de autenticidad criptográfica (AuthTag AES-256-GCM) no coincide. El código ha sido manipulado o firmado con una clave no autorizada.',
       );
     }
 
     try {
-      return JSON.parse(decrypted.toString('utf8'));
+      return JSON.parse(decrypted.toString('utf8')) as T;
     } catch {
       throw new BadRequestException(
         'El contenido descifrado no posee una estructura JSON válida o legible.',

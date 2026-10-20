@@ -23,10 +23,10 @@
 
 ### Phase 2: Critical Fixes
 
-- [ ] **D-30:** Move Swagger from `/api` to `/docs` in `main.ts`
-- [ ] **D-04:** Remove test routes (`/private`, `/private2`, `/private3`) from `auth.controller.ts`
-- [ ] **D-10:** Remove `EmpleadosModule` from exports in `empleados.module.ts`
-- [ ] **D-03:** Remove JWT token from login response body (keep only in cookie)
+- [x] **D-30:** Move Swagger from `/api` to `/docs` in `main.ts`
+- [x] **D-04:** Remove test routes (`/private`, `/private2`, `/private3`) from `auth.controller.ts`
+- [x] **D-10:** Remove `EmpleadosModule` from exports in `empleados.module.ts`
+- [x] **D-03:** Remove JWT token from login response body (keep only in cookie)
 - [ ] **D-26:** Add proper types for `start_date` in `empleados.service.ts`
 
 ### Phase 3: Test Bootstrap
