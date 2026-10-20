@@ -12,7 +12,7 @@ import {
   Patch,
   Param,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto.user';
 import { LoginUserDto } from './dto/Login-user.dto';
@@ -59,15 +59,18 @@ const COOKIE_OPTIONS = {
   path: '/',
 };
 
+import { Throttle } from '@nestjs/throttler';
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly cloudinaryService: CloudinaryService,
-  ) {}
+  ) { }
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -110,22 +113,45 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Iniciar sesión y obtener token de acceso' })
   @ApiResponse({
     status: 200,
-    description: 'Login exitoso. Devuelve los datos del usuario y el JWT.',
+    description: 'Login exitoso. Devuelve los datos del usuario (sin token en body).',
   })
   @ApiResponse({
     status: 401,
     description: 'Unauthorized. Credenciales incorrectas.',
   })
+  @ApiResponse({
+    status: 423,
+    description: 'Locked. Cuenta temporalmente bloqueada por 5 intentos fallidos.',
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests. Límite de intentos por IP excedido.',
+  })
   async LoginUser(
     @Body() LoginUserDto: LoginUserDto,
     @Res({ passthrough: true }) response: Response,
+    @Req() req: Request,
   ) {
-    const result = await this.authService.login(LoginUserDto);
+    const clientIp = req.ip || req.connection?.remoteAddress;
+    const result = await this.authService.login(LoginUserDto, clientIp);
     if (result && result.token) {
-      response.cookie(COOKIE_NAME, result.token, COOKIE_OPTIONS);
+      const cookieConfig = {
+        httpOnly: true,
+        sameSite: isProduction ? ('none' as const) : ('strict' as const),
+        secure: isProduction,
+        path: '/',
+        ...(LoginUserDto.rememberMe
+          ? { maxAge: 1000 * 60 * 60 * 24 * 15 } // 15 days
+          : {}), // Session cookie: destroyed when user closes browser
+      };
+      response.cookie(COOKIE_NAME, result.token, cookieConfig);
+      // Return user data WITHOUT token (httpOnly cookie is the source of truth)
+      const { token: _, ...safeResult } = result;
+      return safeResult;
     }
     return result;
   }
@@ -252,67 +278,5 @@ export class AuthController {
       updateUserDto,
       user,
     );
-  }
-
-  @Get('private')
-  @UseGuards(AuthGuard('jwt'))
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Ruta privada de prueba 1 (Requiere cualquier token válido)',
-  })
-  @ApiResponse({ status: 200, description: 'Acceso permitido' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  testingPrivateRoute(
-    @Req() request: Express.Request,
-    @GetUser() user: User,
-    @GetUser('email') UserEmail: string,
-    @RawHeader() rawHeader: string[],
-  ) {
-    console.log({ request });
-    return {
-      ok: true,
-      message: 'Hola Mundo Private',
-      user,
-      UserEmail,
-      rawHeader,
-    };
-  }
-
-  @Get('private2')
-  @RoleProtected(ValidRoles.admin)
-  @UseGuards(AuthGuard('jwt'), UserRoleGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Ruta privada de prueba 2 (Requiere rol de Admin)' })
-  @ApiResponse({ status: 200, description: 'Acceso permitido' })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized. Token faltante o inválido.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden. El usuario no tiene rol de administrador.',
-  })
-  privateRoute2(@GetUser() user: User) {
-    return {
-      ok: true,
-      user,
-    };
-  }
-
-  @Get('private3')
-  @Auth(ValidRoles.admin)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary:
-      'Ruta privada de prueba 3 (Usando Custom Decorator @Auth - Requiere Admin)',
-  })
-  @ApiResponse({ status: 200, description: 'Acceso permitido' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  privateRoute3(@GetUser() user: User) {
-    return {
-      ok: true,
-      user,
-    };
   }
 }

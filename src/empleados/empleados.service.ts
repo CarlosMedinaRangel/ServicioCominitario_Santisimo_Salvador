@@ -18,6 +18,9 @@ import { IErrorsTypeORM } from 'src/interfaces/error.response';
 import { PrinterService } from 'src/printer/printer.service';
 import { employementLetterReportByID } from 'src/reports/employementLetterByID.report';
 import { constanciaMensualReport } from 'src/reports/constanciaMensual.report';
+import { DocumentsService } from 'src/documents/documents.service';
+import { DocumentType, RecipientType } from 'src/documents/entities/document-verification.entity';
+import { CryptoService } from 'src/crypto/crypto.service';
 import * as bcrypt from 'bcrypt';
 import * as XLSX from 'xlsx';
 import {
@@ -54,6 +57,8 @@ export class EmpleadosService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly PrinterService: PrinterService,
+    private readonly documentsService: DocumentsService,
+    private readonly cryptoService: CryptoService,
     private readonly dataSource: DataSource,
     private readonly activityService: ActivityService,
   ) {}
@@ -74,7 +79,7 @@ export class EmpleadosService {
       const employee = manager.create(Employee, {
         userId: user.id,
         position: createEmpleadoDto.position,
-        start_date: createEmpleadoDto.start_date as any,
+        start_date: new Date(createEmpleadoDto.start_date),
         work_time: createEmpleadoDto.work_time,
         hours_per_day: createEmpleadoDto.hours_per_day,
         work_schedule: createEmpleadoDto.work_schedule,
@@ -117,8 +122,21 @@ export class EmpleadosService {
     });
   }
 
-  async findAll() {
-    return this.employeeRepository.find({ relations: { user: true } });
+  async findAll(status?: string) {
+    if (status === 'all') {
+      return this.employeeRepository.find({ relations: { user: true } });
+    }
+    if (status === 'inactive') {
+      return this.employeeRepository.find({
+        where: { user: { isActive: false } },
+        relations: { user: true },
+      });
+    }
+    // Por defecto, retorna solo empleados activos (ignora eliminados lógicamente)
+    return this.employeeRepository.find({
+      where: { user: { isActive: true } },
+      relations: { user: true },
+    });
   }
 
   async findOne(id: string) {
@@ -165,7 +183,19 @@ export class EmpleadosService {
       throw new BadRequestException(`No hay empleado con este "${id}" ID`);
     }
 
-    return employee;
+    const digitalIdToken = this.cryptoService.encryptPayload(
+      {
+        employeeId: employee.userId,
+        userId: employee.user.id,
+        cedula: employee.user.cedula || '',
+        fullName: employee.user.fullName,
+        cargo: employee.position,
+        issuedAt: new Date().toISOString(),
+      },
+      'EDID',
+    );
+
+    return Object.assign(employee, { digitalIdToken });
   }
 
   async findSchedules(employeeId: string) {
@@ -204,6 +234,25 @@ export class EmpleadosService {
     const employerPosition = options?.employerPosition || 'Director';
     const employerCompany = options?.employerCompany || 'Santisimo Salvador';
 
+    // Generate cryptographic QR verification seal and save record
+    const { record: docRecord, qrDataUrl } =
+      await this.documentsService.issueDocument({
+        documentType: DocumentType.CONSTANCIA_TRABAJO,
+        recipientType: RecipientType.EMPLOYEE,
+        recipientId: employee.userId,
+        recipientIdentifier: user.cedula || 'N/A',
+        recipientName: user.fullName,
+        issuedByName: `${employerName} (${employerPosition})`,
+        metadata: {
+          empresa: employerCompany,
+          cargo: employee.position,
+          horas: employee.hours_per_day,
+          horario: employee.work_schedule,
+          fechaInicio: employee.start_date,
+          mes: options?.month || null,
+        },
+      });
+
     if (options?.month) {
       const [yearStr, monthStr] = options.month.split('-');
       const year = parseInt(yearStr, 10);
@@ -231,6 +280,8 @@ export class EmpleadosService {
         employeeHours: employee.hours_per_day,
         employeeWorkSchedule: employee.work_schedule,
         month: `${monthStr}-${yearStr}`,
+        qrDataUrl,
+        verificationId: docRecord.id,
         activities: activities.map((a) => ({
           tipo: a.tipo,
           descripcion: a.descripcion,
@@ -260,9 +311,19 @@ export class EmpleadosService {
       employeeStartDate: employee.start_date,
       employeeHours: employee.hours_per_day,
       employeeWorkSchedule: employee.work_schedule,
+      qrDataUrl,
+      verificationId: docRecord.id,
     });
 
-    return this.PrinterService.createPdf(docDefinition);
+    const pdf = this.PrinterService.createPdf(docDefinition);
+    void this.activityService.log(employee.userId, {
+      tipo: 'Constancia Generada',
+      descripcion: 'Constancia de trabajo',
+      detalle: `Firmada por ${employerName} (${employerPosition})`,
+      destacada: true,
+    });
+
+    return pdf;
   }
 
   async update(id: string, updateEmpleadoDto: UpdateEmpleadoDto) {
@@ -278,7 +339,7 @@ export class EmpleadosService {
             position: updateEmpleadoDto.position,
           }),
           ...(updateEmpleadoDto.start_date && {
-            start_date: updateEmpleadoDto.start_date as any,
+            start_date: new Date(updateEmpleadoDto.start_date),
           }),
           ...(updateEmpleadoDto.work_time && {
             work_time: updateEmpleadoDto.work_time,
@@ -470,10 +531,39 @@ export class EmpleadosService {
 
   async remove(id: string) {
     const employee = await this.findOne(id);
+    const user = await this.userRepository.findOneBy({ id: employee.userId });
+    if (!user) {
+      throw new NotFoundException(`Usuario no encontrado para el empleado ${id}`);
+    }
 
     try {
-      await this.employeeRepository.remove(employee);
-      return `Eliminado`;
+      user.isActive = false;
+      await this.userRepository.save(user);
+      return {
+        message: `Empleado ${user.fullName} desactivado exitosamente (eliminación lógica)`,
+        userId: user.id,
+        isActive: false,
+      };
+    } catch (error: any) {
+      this.handleExceptions(error);
+    }
+  }
+
+  async toggleStatus(id: string) {
+    const employee = await this.findOne(id);
+    const user = await this.userRepository.findOneBy({ id: employee.userId });
+    if (!user) {
+      throw new NotFoundException(`Usuario no encontrado para el empleado ${id}`);
+    }
+
+    try {
+      user.isActive = !user.isActive;
+      await this.userRepository.save(user);
+      return {
+        message: `Empleado ${user.fullName} ${user.isActive ? 'activado' : 'desactivado'} exitosamente`,
+        userId: user.id,
+        isActive: user.isActive,
+      };
     } catch (error: any) {
       this.handleExceptions(error);
     }
@@ -553,12 +643,10 @@ export class EmpleadosService {
           const password = data.password
             ? String(data.password)
             : `${data.cedula || 'Default'}123!`;
-
+          const hashedPassword = await bcrypt.hash(password, 10);
           user = this.userRepository.create({
-            email: String(data.email || `${data.cedula}@santisimo.edu`)
-              .toLowerCase()
-              .trim(),
-            password: bcrypt.hashSync(password, 10),
+            email: String(data.email || `${data.cedula}@santisimo.edu`).toLowerCase().trim(),
+            password: hashedPassword,
             fullName: String(data.fullName || data.name || 'Sin Nombre'),
             roles: ['user'],
             isActive: true,
@@ -583,11 +671,11 @@ export class EmpleadosService {
         const employeeData: Partial<Employee> = {
           position: data.position ? String(data.position) : 'General',
           start_date: data.start_date
-            ? (this.formatDateValue(data.start_date) as any)
-            : (new Date().toISOString().split('T')[0] as any),
+            ? new Date(this.formatDateValue(data.start_date))
+            : new Date(),
           work_time: data.work_time
             ? this.normalizeTime(String(data.work_time))
-            : '08:00', // 👈 normalizado
+            : '08:00',
           hours_per_day: data.hours_per_day ? Number(data.hours_per_day) : 8,
           work_schedule: data.work_schedule
             ? String(data.work_schedule)

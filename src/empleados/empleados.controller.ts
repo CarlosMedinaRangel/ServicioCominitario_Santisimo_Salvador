@@ -157,13 +157,19 @@ export class EmpleadosController {
   @Auth(ValidRoles.admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener la lista de todos los empleados' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['active', 'inactive', 'all'],
+    description: 'Filtro por estado de actividad (default: all)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Lista de empleados obtenida con éxito.',
     type: [Employee],
   })
-  findAll() {
-    return this.empleadosService.findAll();
+  findAll(@Query('status') status?: string) {
+    return this.empleadosService.findAll(status);
   }
 
   @Get(':id')
@@ -338,17 +344,33 @@ export class EmpleadosController {
     return this.empleadosService.update(id, updateEmpleadoDto);
   }
 
-  @Delete(':id')
+  @Patch(':id/toggle-status')
   @Auth(ValidRoles.admin)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Eliminar un empleado' })
+  @ApiOperation({ summary: 'Alternar estado activo/inactivo de un empleado (desactivación o reactivación lógica)' })
   @ApiParam({
     name: 'id',
-    description: 'UUID del empleado a eliminar',
+    description: 'UUID del empleado a alternar',
   })
   @ApiResponse({
     status: 200,
-    description: 'Empleado eliminado correctamente.',
+    description: 'Estado del empleado alternado correctamente.',
+  })
+  toggleStatus(@Param('id') id: string) {
+    return this.empleadosService.toggleStatus(id);
+  }
+
+  @Delete(':id')
+  @Auth(ValidRoles.admin)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Desactivar un empleado (eliminación lógica)' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID del empleado a desactivar',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Empleado desactivado correctamente.',
   })
   @ApiResponse({
     status: 404,

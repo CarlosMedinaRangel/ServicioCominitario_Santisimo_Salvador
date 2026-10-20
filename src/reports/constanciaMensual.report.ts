@@ -2,42 +2,48 @@ import type { StyleDictionary } from 'pdfmake/build/pdfmake';
 import type { TDocumentDefinitions } from 'src/interfaces/pdfmake.interface';
 import { headerSection } from './sections/header.section';
 import { DateFormatter } from 'src/helpers/date-formatter';
+import { User } from 'src/auth/entities/auth.entity';
+import { Employee } from 'src/empleados/entities/employee.entity';
+import { DocumentVerification } from 'src/documents/entities/document-verification.entity';
 
 const styles: StyleDictionary = {
   header: {
-    fontSize: 22,
+    fontSize: 20,
     bold: true,
     alignment: 'center',
-    margin: [0, 60, 0, 50],
+    margin: [0, 30, 0, 10],
   },
   subheader: {
-    fontSize: 14,
-    bold: true,
-    margin: [0, 10, 0, 10],
+    fontSize: 12,
+    alignment: 'center',
+    margin: [0, 0, 0, 20],
+    color: '#475569',
   },
   body: {
     alignment: 'justify',
-    margin: [0, 0, 0, 20],
+    margin: [0, 0, 0, 15],
+    lineHeight: 1.25,
   },
   tableHeader: {
-    fontSize: 10,
+    fontSize: 9,
     bold: true,
-    fillColor: '#f3f4f6',
+    fillColor: '#f1f5f9',
     margin: [0, 4, 0, 4],
+    color: '#1e293b',
   },
   tableCell: {
-    fontSize: 9,
+    fontSize: 8,
     margin: [0, 3, 0, 3],
   },
   signature: {
-    fontSize: 14,
+    fontSize: 11,
     bold: true,
   },
   footer: {
-    fontSize: 10,
+    fontSize: 8,
     italics: true,
     alignment: 'center',
-    margin: [0, 0, 0, 20],
+    margin: [0, 0, 0, 10],
   },
 };
 
@@ -51,15 +57,17 @@ interface ActivityData {
 interface MonthlyReportProps {
   employerName: string;
   employerPosition: string;
-  employeeName: string;
-  employeeCedula: string;
-  employeePosition: string;
-  employeeStartDate: Date;
-  employeeHours: number;
-  employeeWorkSchedule: string;
+  employeeName: User['fullName'];
+  employeeCedula: NonNullable<User['cedula']>;
+  employeePosition: Employee['position'];
+  employeeStartDate: Employee['start_date'];
+  employeeHours: Employee['hours_per_day'];
+  employeeWorkSchedule: Employee['work_schedule'];
   employerCompany: string;
   month: string;
   activities: ActivityData[];
+  qrDataUrl?: string;
+  verificationId?: DocumentVerification['id'];
 }
 
 const monthsMap: Record<string, string> = {
@@ -83,9 +91,9 @@ function formatMonth(monthStr: string): string {
 }
 
 function formatDate(date: Date): string {
-  return date.toLocaleDateString('es-ES', {
+  return new Date(date).toLocaleDateString('es-ES', {
     day: '2-digit',
-    month: 'long',
+    month: '2-digit',
     year: 'numeric',
   });
 }
@@ -105,57 +113,122 @@ export const constanciaMensualReport = (
     employerPosition,
     month,
     activities,
+    qrDataUrl,
+    verificationId,
   } = props;
 
   const activityRows = activities.map((a) => [
     { text: formatDate(a.timestamp), style: 'tableCell' },
     { text: a.tipo, style: 'tableCell' },
     { text: a.descripcion, style: 'tableCell' },
-    { text: a.detalle, style: 'tableCell' },
+    { text: a.detalle || '-', style: 'tableCell' },
   ]);
 
   const docDefinition: TDocumentDefinitions = {
     styles,
-    pageMargins: [40, 60, 40, 60],
+    pageMargins: [40, 45, 40, 45],
     header: headerSection({ showLogo: true, ShowDate: true }),
     content: [
       { text: 'CONSTANCIA DE TRABAJO MENSUAL', style: 'header' },
       {
         text: `Correspondiente al mes de ${formatMonth(month)}`,
-        alignment: 'center',
-        fontSize: 12,
-        margin: [0, 0, 0, 30],
+        style: 'subheader',
       },
       {
         text: [
-          `Yo, ${employerName}, en mi calidad de ${employerPosition} de ${employerCompany}, por medio de la presente certifico que `,
+          `Yo, `,
+          { text: employerName, bold: true },
+          `, en mi calidad de ${employerPosition} de ${employerCompany}, por medio de la presente certifico que `,
           { text: `${employeeName}`, bold: true },
           `, portador de la cédula de identidad Nº ${employeeCedula}, ha laborado en nuestra institución desde el `,
-          {
-            text: `${DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate))}`,
-            bold: false,
-          },
+          { text: `${DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate))}` },
           `, desempeñando el cargo de `,
           { text: `${employeePosition}`, bold: true },
           `, con una jornada de ${employeeHours} horas semanales, en horario de ${employeeWorkSchedule}.\n\n`,
         ],
         style: 'body',
       },
-
+      /* =========================================================================
+       * AI_PRESERVE_FEATURE: Monthly Activities Breakdown Table
+       * DO NOT DELETE OR STRIP THIS COMMENT BLOCK.
+       * 
+       * Kept in reserve while historical monthly activity recording is being fully fledged out.
+       * When ready to display detailed monthly activity logs on the printed letter, uncomment this block:
+       *
+      activities.length > 0
+        ? {
+            table: {
+              headerRows: 1,
+              widths: ['15%', '20%', '35%', '30%'],
+              body: [
+                [
+                  { text: 'Fecha', style: 'tableHeader' },
+                  { text: 'Tipo', style: 'tableHeader' },
+                  { text: 'Descripción', style: 'tableHeader' },
+                  { text: 'Detalle', style: 'tableHeader' },
+                ],
+                ...activityRows,
+              ],
+            },
+            layout: 'lightHorizontalLines',
+            margin: [0, 5, 0, 15],
+          }
+        : {
+            text: 'No se registraron actividades especiales para este periodo.',
+            italics: true,
+            margin: [0, 5, 0, 15],
+          },
+       * ========================================================================= */
       {
-        text: 'Se expide la presente constancia a solicitud del interesado para los fines que considere pertinentes.',
+        text: 'Se expide la presente constancia a solicitud de la parte interesada para los fines que considere pertinentes.',
         style: 'body',
-        margin: [0, 10, 0, 40],
+        margin: [0, 5, 0, 15],
       },
-      '\n\n\n\n\n\n',
-      { text: 'Atentamente,', style: 'signature' },
-      { text: employerName, style: 'signature' },
-      { text: employerPosition, style: 'signature' },
-      { text: employerCompany, style: 'signature' },
-      { text: DateFormatter.getDDMMMMYYYY(new Date()), style: 'signature' },
+      {
+        columns: [
+          {
+            width: '*',
+            stack: [
+              { text: 'Atentamente,', style: 'signature', margin: [0, 0, 0, 10] },
+              { text: employerName, style: 'signature' },
+              { text: employerPosition, fontSize: 9, italics: true },
+              { text: employerCompany, fontSize: 9 },
+              { text: DateFormatter.getDDMMMMYYYY(new Date()), fontSize: 8, color: '#64748b', margin: [0, 3, 0, 0] },
+            ],
+          },
+          qrDataUrl
+            ? {
+                width: 130,
+                alignment: 'center',
+                stack: [
+                  {
+                    image: qrDataUrl,
+                    width: 70,
+                    height: 70,
+                    alignment: 'center',
+                  },
+                  {
+                    text: 'SELLO DIGITAL OFICIAL',
+                    fontSize: 7,
+                    bold: true,
+                    alignment: 'center',
+                    margin: [0, 3, 0, 1],
+                  },
+                  {
+                    text: verificationId ? `ID: ${verificationId.slice(0, 8)}...` : 'Verificación Criptográfica',
+                    fontSize: 6,
+                    alignment: 'center',
+                    color: '#64748b',
+                  },
+                ],
+              }
+            : { width: 0, text: '' },
+        ],
+        margin: [0, 40, 0, 0],
+      },
     ],
     footer: {
-      text: 'Este documento es una constancia mensual de trabajo y no representa un compromiso laboral.',
+      text: 'Este documento cuenta con un sello digital de autenticidad criptográfica verificable en el sistema de Santísimo Salvador.',
       style: 'footer',
     },
   };

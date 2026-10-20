@@ -86,7 +86,7 @@ export class SeedService {
     const elena = this.employeeRepository.create({
       userId: elenaUser.id,
       position: 'Docente',
-      start_date: new Date('2018-09-01') as any,
+      start_date: new Date('2018-09-01'),
       work_time: '08:00:00',
       hours_per_day: 8,
       work_schedule: 'Lunes a Viernes, 8am - 4pm',
@@ -204,7 +204,7 @@ export class SeedService {
     const carlos = this.employeeRepository.create({
       userId: carlosUser.id,
       position: 'Profesor Titular',
-      start_date: new Date('2020-02-15') as any,
+      start_date: new Date('2020-02-15'),
       work_time: '07:30:00',
       hours_per_day: 8,
       work_schedule: 'Lunes a Viernes, 7:30am - 3:30pm',
@@ -298,7 +298,7 @@ export class SeedService {
     const ana = this.employeeRepository.create({
       userId: anaUser.id,
       position: 'Coordinadora Académica',
-      start_date: new Date('2022-06-01') as any,
+      start_date: new Date('2022-06-01'),
       work_time: '08:00:00',
       hours_per_day: 8,
       work_schedule: 'Lunes a Viernes, 8am - 4pm',
@@ -388,7 +388,7 @@ export class SeedService {
         position: positions[Math.floor(Math.random() * positions.length)],
         start_date: new Date(
           `202${Math.floor(Math.random() * 4) + 1}-0${Math.floor(Math.random() * 9) + 1}-01`,
-        ) as any,
+        ),
         work_time: slot.time,
         hours_per_day: slot.hours,
         work_schedule: `Lunes a Viernes, ${slot.label}`,

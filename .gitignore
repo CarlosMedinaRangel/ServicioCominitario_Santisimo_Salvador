@@ -6,6 +6,7 @@
 
 
 /postgres
+/pgadmin
 .env
 
 # Logs
@@ -59,3 +60,6 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Playwright MCP artifacts
+.playwright-mcp/
