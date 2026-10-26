@@ -6,6 +6,7 @@ import {
   OneToMany,
   OneToOne,
   PrimaryColumn,
+  type Relation,
 } from 'typeorm';
 import { User } from '../../auth/entities/auth.entity';
 import { Schedule } from './schedule.entity';
@@ -24,7 +25,7 @@ export class Employee {
 
   @OneToOne(() => User, (user) => user.employee)
   @JoinColumn({ name: 'userId' })
-  user!: User;
+  user!: Relation<User>;
 
   @ApiProperty({ example: 'Docente', description: 'Cargo del empleado' })
   @Column('varchar', { length: 100 })

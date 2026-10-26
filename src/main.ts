@@ -41,7 +41,12 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, documentFactory);
+  SwaggerModule.setup('docs', app, documentFactory, {
+    swaggerOptions: {
+      withCredentials: true,
+      persistAuthorization: true,
+    },
+  });
 
   const port = process.env.BACKEND_PORT || process.env.PORT || 3000;
   const devHost = process.env.DEV_HOST || 'localhost';

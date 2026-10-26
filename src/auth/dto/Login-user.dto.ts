@@ -35,8 +35,9 @@ export class LoginUserDto {
   password!: string;
 
   @ApiPropertyOptional({
-    example: '0.xxxxxxxxxxx.xxxxxxxxx',
-    description: 'Token de verificación de Cloudflare Turnstile anti-bot',
+    example: 'XXXX.DUMMY.TOKEN.XXXX',
+    description:
+      'Token anti-bot de Cloudflare Turnstile. En desarrollo / Swagger docs (/docs), puedes enviar "XXXX.DUMMY.TOKEN.XXXX" para pruebas sin widget.',
   })
   @IsString()
   @IsOptional()

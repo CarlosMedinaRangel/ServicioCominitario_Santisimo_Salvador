@@ -78,6 +78,7 @@
 | Never access database inside loops without batching | Use transactions or bulk operations |
 | Never trust client-side validation alone | Always validate on backend with DTOs |
 | Never expose internal error messages to client | Return generic messages, log details server-side |
+| Never use blacklist/delete destructuring for responses | Use strict allowlist projection mappers (e.g. toSafeUser) |
 | Never create new files when existing ones can be extended | Extend existing patterns unless new module is required |
 
 **PowerShell commands:**
@@ -129,6 +130,7 @@ src/[module]/
 ### Service Rules
 - Use custom repository classes extending `Repository<Entity>` — not raw TypeORM `Repository`.
 - Async crypto only: `await bcrypt.hash(password, 10)`. Never `bcrypt.hashSync` in request paths.
+- Security allowlist: Never return entities directly via destructuring (`const { password, ...rest } = user`). Always map through a strict allowlist projection (e.g., `toSafeUser`) so newly added entity columns never leak to clients.
 - Target ~200 lines per service. Hard limit 400 lines with justification comment.
 - Split into `src/[module]/services/` when exceeded.
 - Error handling: NestJS exceptions only (`BadRequestException`, `UnauthorizedException`).
@@ -138,6 +140,7 @@ src/[module]/
 - Every mutation needs `@Auth()` for authentication.
 - Admin-only routes: `@Auth(ValidRoles.admin)` or `@RoleProtected(ValidRoles.admin)`.
 - DTOs with class-validator: `whitelist: true`, `forbidNonWhitelisted: true`.
+- Action-based `@Post()` endpoints (`login`, `logout`, `verify`) MUST explicitly declare `@HttpCode(HttpStatus.OK)`. By default, NestJS returns `201 Created` for POST, which violates the OpenAPI `@ApiResponse({ status: 200 })` contract.
 - Swagger decorators on all endpoints.
 - Swagger mounts at `/docs`, NOT `/api`.
 
@@ -145,7 +148,8 @@ src/[module]/
 - Primary keys: UUID (auto-generated).
 - Soft delete: `isActive` boolean on User entity. Never hard-delete.
 - Timestamps: `@CreateDateColumn()`, `@UpdateDateColumn()`.
-- Relations: Explicit `@ManyToOne`, `@OneToMany`.
+- Relations: Explicit `@ManyToOne`, `@OneToMany`. In entity TypeScript definitions, declare relation properties with `?:` optionality (e.g. `employee?: Employee;`), reflecting that relations are not loaded unless explicitly joined.
+- **Universal Sensitive Column Rule**: Any column containing credentials, security counters, internal state, financial data, or confidential records across ALL entities (present and future: `User`, `Employee`, `Student`, etc.) MUST declare `{ select: false }` by default and omit `@ApiProperty`. They may ONLY be fetched via explicit query selection (`select: { ... }` or `addSelect()`) in authorized business flows. This provides dual-layer defense: database-level exclusion plus API allowlist mapping.
 
 ---
 
@@ -159,10 +163,19 @@ src/[module]/
 
 ## 5. TESTING RULES
 
-- New endpoint = test file created alongside.
+- **Dual-Layer Testing Architecture**:
+  1. **Pure Unit Tests (`.spec.ts`)**: For isolated algorithms and domain services (`crypto.service.spec.ts`, `turnstile.service.spec.ts`, guards, and business logic).
+  2. **HTTP Integration Tests (`.http.spec.ts`)**: Every controller MUST have a Supertest suite verifying:
+     - DTO validation pipes (`whitelist: true, forbidNonWhitelisted: true`) rejecting invalid formats and unwhitelisted injected properties with `400 Bad Request`.
+     - Authentication & Role Guards returning `401 Unauthorized` for missing/bad tokens and `403 Forbidden` for non-admin callers.
+     - Security invariants: JWT tokens stripped from response bodies, `HttpOnly`, `Path=/`, and `SameSite=Strict` cookie headers verified.
+     - Execution of action endpoints returning exact status codes (`200 OK` vs `201 Created`).
+- **Zero Double-Cast Hacks ("Type Lies")**:
+  - Never use `X as unknown as Y` or `X as any` in tests or domain entities.
+  - In fixtures, bind mock data with `satisfies EntityData<T>`. When an engineer alters an entity (adds/modifies/deletes a column), TypeScript compilation MUST fail in the fixture immediately, preventing test data drift.
 - Priority: crypto service → documents service → auth service → employees service.
-- Mock Cloudinary and Turnstile in unit tests.
-- Use Jest + ts-jest + supertest.
+- Mock external services (Cloudinary, Cloudflare Turnstile API) in unit and integration tests.
+- Always run tests with `bun run test` via PowerShell (`BypassSandbox: true` due to Windows filesystem handle requirements).
 
 ---
 

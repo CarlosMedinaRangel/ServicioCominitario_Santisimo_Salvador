@@ -5,6 +5,7 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  type Relation,
 } from 'typeorm';
 import { Employee } from './employee.entity';
 
@@ -23,7 +24,7 @@ export class Activity {
 
   @ManyToOne(() => Employee, (employee) => employee.activities)
   @JoinColumn({ name: 'employeeId' })
-  employee!: Employee;
+  employee?: Relation<Employee>;
 
   @ApiProperty({ example: 'Publicación de Calificaciones', description: 'Tipo de actividad' })
   @Column('varchar', { length: 200 })

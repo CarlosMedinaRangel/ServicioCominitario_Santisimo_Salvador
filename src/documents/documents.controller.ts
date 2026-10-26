@@ -5,7 +5,10 @@ import {
   Patch,
   Param,
   Get,
+  Query,
   ParseUUIDPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -13,23 +16,27 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { DocumentsService } from './documents.service';
 import { VerifyDocumentDto } from './dto/verify-document.dto';
 import { Auth } from '../auth/Decorators/auth.decorator';
 import { ValidRoles } from '../auth/interfaces';
-import { DocumentVerification } from './entities/document-verification.entity';
+import { DocumentVerification, DocumentStatus } from './entities/document-verification.entity';
 
 @ApiTags('Documents')
 @Controller('documents')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
+  @HttpCode(HttpStatus.OK)
   @Post('verify')
+  @Auth(ValidRoles.admin)
+  @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Verificar la autenticidad de un código QR físico/digital',
+    summary: 'Verificar la autenticidad de un código QR físico/digital (Solo Administrador)',
     description:
-      'Punto único de verificación. Recibe el código alfanumérico escaneado del sello QR (ej: SS-DOC:v1:...), lo descifra con AES-256-GCM, valida su firma y retorna los datos del documento verificado.',
+      'Punto único de verificación administrativa. Recibe el código alfanumérico escaneado del sello QR (ej: SS-DOC:v1:...), lo descifra con AES-256-GCM, valida su firma y retorna los datos del documento verificado.',
   })
   @ApiBody({
     type: VerifyDocumentDto,
@@ -53,6 +60,30 @@ export class DocumentsController {
   })
   verifyDocument(@Body() verifyDto: VerifyDocumentDto) {
     return this.documentsService.verifyDocument(verifyDto.code);
+  }
+
+  @Get('stats')
+  @Auth(ValidRoles.admin)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Estadísticas y conteo global de comprobantes emitidos (Solo Administrador)' })
+  @ApiResponse({ status: 200, description: 'Totales de constancias emitidas, válidas y revocadas.' })
+  getStats() {
+    return this.documentsService.getStats();
+  }
+
+  @Get()
+  @Auth(ValidRoles.admin)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Listar todos los comprobantes emitidos con paginación (Solo Administrador)' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
+  @ApiQuery({ name: 'status', enum: DocumentStatus, required: false })
+  findAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: DocumentStatus,
+  ) {
+    return this.documentsService.findAll({ page, limit, status });
   }
 
   @Patch(':id/revoke')

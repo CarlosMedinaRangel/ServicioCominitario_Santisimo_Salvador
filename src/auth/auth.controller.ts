@@ -11,6 +11,8 @@ import {
   UploadedFile,
   Patch,
   Param,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
@@ -112,6 +114,7 @@ export class AuthController {
     return result;
   }
 
+  @HttpCode(HttpStatus.OK)
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Iniciar sesión y obtener token de acceso' })
@@ -156,6 +159,7 @@ export class AuthController {
     return result;
   }
 
+  @HttpCode(HttpStatus.OK)
   @Post('logout')
   @ApiOperation({ summary: 'Cerrar sesión y limpiar cookie httpOnly' })
   @ApiResponse({
@@ -185,15 +189,18 @@ export class AuthController {
     return this.authService.getMyEmployeeProfile(user.id);
   }
 
-  @Get('check-status')
+  @Get(['me', 'check-status'])
   @Auth()
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Verificar el estado de autenticación y renovar JWT',
+    summary: 'Obtener perfil del usuario autenticado (/auth/me)',
+    description: 'Punto único de consulta de sesión. Retorna la información pública del usuario autenticado.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Token válido. Devuelve el usuario y un nuevo JWT.',
+    description:
+      'Sesión válida. Devuelve los datos públicos del usuario autenticado (sin token en body ni metadatos internos).',
+    type: User,
   })
   @ApiResponse({
     status: 401,

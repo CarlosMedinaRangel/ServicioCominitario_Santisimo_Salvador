@@ -48,7 +48,8 @@ import { APP_GUARD } from '@nestjs/core';
     PrinterModule,
 
     AuthModule,
-    SeedModule,
+    // 🛡️ SEGURIDAD: SeedModule solo se monta en desarrollo local. En producción no existe en el router.
+    ...(process.env.NODE_ENV === 'development' ? [SeedModule] : []),
     CloudinaryModule,
     CryptoModule,
     DocumentsModule,

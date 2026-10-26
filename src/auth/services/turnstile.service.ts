@@ -30,6 +30,18 @@ export class TurnstileService {
       );
     }
 
+    // Permite tokens de prueba en desarrollo para facilitar pruebas en Swagger /docs
+    const isDevelopment =
+      this.configService.get<string>('NODE_ENV') === 'development';
+    if (
+      isDevelopment &&
+      (token === 'XXXX.DUMMY.TOKEN.XXXX' ||
+        token === '1x00000000000000000000AA' ||
+        token === 'bypass-dev-token')
+    ) {
+      return true;
+    }
+
     try {
       const formData = new URLSearchParams();
       formData.append('secret', this.secretKey);
