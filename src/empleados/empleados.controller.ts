@@ -153,23 +153,38 @@ export class EmpleadosController {
     return this.empleadosService.updateByUserId(user.id, updateEmployeeDto);
   }
 
+  @Get('count')
+  @Auth(ValidRoles.admin)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Conteo total y desglose de empleados (activos, inactivos, total)' })
+  @ApiResponse({ status: 200, description: 'Estadísticas numéricas de empleados.' })
+  getCounts() {
+    return this.empleadosService.getCounts();
+  }
+
   @Get()
   @Auth(ValidRoles.admin)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Obtener la lista de todos los empleados' })
+  @ApiOperation({ summary: 'Obtener la lista de todos los empleados (con soporte opcional de paginación)' })
   @ApiQuery({
     name: 'status',
     required: false,
     enum: ['active', 'inactive', 'all'],
     description: 'Filtro por estado de actividad (default: all)',
   })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
   @ApiResponse({
     status: 200,
     description: 'Lista de empleados obtenida con éxito.',
     type: [Employee],
   })
-  findAll(@Query('status') status?: string) {
-    return this.empleadosService.findAll(status);
+  findAll(
+    @Query('status') status?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.empleadosService.findAll(status, page, limit);
   }
 
   @Get(':id')

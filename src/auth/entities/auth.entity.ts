@@ -6,6 +6,7 @@ import {
   Entity,
   OneToOne,
   PrimaryGeneratedColumn,
+  type Relation,
 } from 'typeorm';
 import { Employee } from '../../empleados/entities/employee.entity';
 
@@ -60,7 +61,7 @@ export class User {
   @Column('text', { unique: true, nullable: true })
   imagen?: string | null;
 
-  @Column('text', { nullable: true })
+  @Column('text', { nullable: true, select: false })
   publicId?: string | null;
 
   @ApiProperty({
@@ -80,28 +81,17 @@ export class User {
   @Column('text', { array: true, default: ['user'] })
   roles!: string[];
 
-  @ApiProperty({
-    example: 0,
-    description: 'Contador de intentos fallidos de inicio de sesión',
-    default: 0,
-  })
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'int', default: 0, select: false })
   failedLoginAttempts!: number;
 
-  @ApiPropertyOptional({
-    description: 'Fecha y hora hasta la cual la cuenta permanece bloqueada por seguridad',
-  })
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamp', nullable: true, select: false })
   lockedUntil?: Date | null;
 
-  @ApiPropertyOptional({
-    description: 'Fecha y hora del último intento fallido de inicio de sesión',
-  })
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamp', nullable: true, select: false })
   lastFailedAttemptAt?: Date | null;
 
   @OneToOne(() => Employee, (employee) => employee.user)
-  employee?: Employee;
+  employee?: Relation<Employee>;
 
   @BeforeInsert()
   checkFilesBeforeInsert() {

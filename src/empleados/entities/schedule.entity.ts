@@ -6,6 +6,7 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  type Relation,
 } from 'typeorm';
 import { Employee } from './employee.entity';
 import { Group } from './group.entity';
@@ -25,10 +26,10 @@ export class Schedule {
 
   @ManyToOne(() => Employee, (employee) => employee.schedules)
   @JoinColumn({ name: 'employeeId' })
-  employee!: Employee;
+  employee?: Relation<Employee>;
 
   @OneToMany(() => Group, (group) => group.schedule)
-  groups!: Group[];
+  groups?: Relation<Group>[];
 
   @ApiProperty({
     example: 'Biología Molecular III',

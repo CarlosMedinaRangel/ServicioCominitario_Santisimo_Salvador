@@ -25,6 +25,29 @@ import {
   ActivityService,
   LogActivityInput,
 } from 'src/empleados/activity-service/activity-service.service';
+export interface SafeUser {
+  id: string;
+  email: string;
+  fullName: string;
+  cedula?: string;
+  telefono?: string;
+  imagen?: string | null;
+  isActive: boolean;
+  roles: string[];
+}
+
+export function toSafeUser(user: Partial<User>): SafeUser {
+  return {
+    id: user.id!,
+    email: user.email!,
+    fullName: user.fullName!,
+    cedula: user.cedula,
+    telefono: user.telefono,
+    imagen: user.imagen ?? null,
+    isActive: user.isActive ?? true,
+    roles: user.roles ?? [],
+  };
+}
 
 @Injectable()
 export class AuthService {
@@ -50,8 +73,7 @@ export class AuthService {
       });
 
       await this.userRepository.save(user);
-      const { password: _, ...userInfo } = user;
-      return userInfo;
+      return toSafeUser(user);
     } catch (error: any) {
       this.handleDBErrors(error);
     }
@@ -155,9 +177,8 @@ export class AuthService {
       await this.userRepository.save(user);
     }
 
-    const { password: _, ...userInfo } = user;
     return {
-      ...userInfo,
+      ...toSafeUser(user),
       token: this.getJWTToken({ id: user.id }),
     };
   }
@@ -194,16 +215,7 @@ export class AuthService {
     }
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        cedula: user.cedula,
-        telefono: user.telefono,
-        isActive: user.isActive,
-        roles: user.roles,
-        imagen: user.imagen,
-      },
+      user: toSafeUser(user),
       employee: user.employee || null,
       digitalIdToken,
     };
@@ -222,11 +234,8 @@ export class AuthService {
     throw new InternalServerErrorException('Check the server logs');
   }
 
-  checkAuthStatus(user: User) {
-    return {
-      ...user,
-      token: this.getJWTToken({ id: user.id }),
-    };
+  checkAuthStatus(user: User): SafeUser {
+    return toSafeUser(user);
   }
 
   async update(
@@ -337,9 +346,8 @@ export class AuthService {
 
     try {
       const result = await this.userRepository.save(user);
-      const { password, ...userInfo } = result;
       await this.activityService.logMany(userId, activities);
-      return userInfo;
+      return toSafeUser(result);
     } catch (error: any) {
       this.handleDBErrors(error);
     }

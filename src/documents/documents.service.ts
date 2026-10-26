@@ -271,4 +271,48 @@ export class DocumentsService {
       order: { issuedAt: 'DESC' },
     });
   }
+
+  /**
+   * Lists all issued document verifications with optional filtering and pagination.
+   */
+  async findAll(options?: {
+    status?: DocumentStatus;
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: DocumentVerification[]; total: number; page: number; totalPages: number }> {
+    const page = Math.max(1, Number(options?.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(options?.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const where = options?.status ? { status: options.status } : {};
+
+    const [data, total] = await this.docVerificationRepo.findAndCount({
+      where,
+      order: { issuedAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return {
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Returns verification statistics (total, valid, revoked).
+   */
+  async getStats(): Promise<{ total: number; valid: number; revoked: number }> {
+    const total = await this.docVerificationRepo.count();
+    const valid = await this.docVerificationRepo.count({
+      where: { status: DocumentStatus.VALID },
+    });
+    const revoked = await this.docVerificationRepo.count({
+      where: { status: DocumentStatus.REVOKED },
+    });
+
+    return { total, valid, revoked };
+  }
 }

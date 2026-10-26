@@ -122,21 +122,52 @@ export class EmpleadosService {
     });
   }
 
-  async findAll(status?: string) {
+  async findAll(status?: string, page?: number, limit?: number) {
+    let whereCondition: any = { user: { isActive: true } };
     if (status === 'all') {
-      return this.employeeRepository.find({ relations: { user: true } });
+      whereCondition = {};
+    } else if (status === 'inactive') {
+      whereCondition = { user: { isActive: false } };
     }
-    if (status === 'inactive') {
-      return this.employeeRepository.find({
-        where: { user: { isActive: false } },
+
+    // Modo paginado si se pasa 'page'
+    if (page !== undefined && page !== null) {
+      const pageNum = Math.max(1, Number(page) || 1);
+      const limitNum = Math.max(1, Math.min(100, Number(limit) || 20));
+      const skip = (pageNum - 1) * limitNum;
+
+      const [data, total] = await this.employeeRepository.findAndCount({
+        where: whereCondition,
         relations: { user: true },
+        skip,
+        take: limitNum,
       });
+
+      return {
+        data,
+        total,
+        page: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+      };
     }
-    // Por defecto, retorna solo empleados activos (ignora eliminados lógicamente)
+
+    // Modo array completo (retrocompatible con frontend actual)
     return this.employeeRepository.find({
-      where: { user: { isActive: true } },
+      where: whereCondition,
       relations: { user: true },
     });
+  }
+
+  async getCounts() {
+    const total = await this.employeeRepository.count();
+    const active = await this.employeeRepository.count({
+      where: { user: { isActive: true } },
+    });
+    const inactive = await this.employeeRepository.count({
+      where: { user: { isActive: false } },
+    });
+
+    return { total, active, inactive };
   }
 
   async findOne(id: string) {
