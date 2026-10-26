@@ -26,20 +26,31 @@
 - [x] **D-30:** Move Swagger from `/api` to `/docs` in `main.ts`
 - [x] **D-04:** Remove test routes (`/private`, `/private2`, `/private3`) from `auth.controller.ts`
 - [x] **D-10:** Remove `EmpleadosModule` from exports in `empleados.module.ts`
-- [x] **D-03:** Remove JWT token from login response body (keep only in cookie)
-- [ ] **D-26:** Add proper types for `start_date` in `empleados.service.ts`
+- [x] **D-03:** Remove JWT token from login & `/auth/me` response body (httpOnly cookie only). Apply universal `{ select: false }` and `toSafeUser` allowlist projection.
+- [x] **D-26:** Add proper types for `start_date` in `seed.service.ts` / `employees.canonical.ts`
+- [x] **D-27:** Change all `bcrypt.hashSync` calls to async `await bcrypt.hash()` in request paths
 
-### Phase 3: Test Bootstrap
+### Phase 3: Test Bootstrap & Infrastructure
 
-- [ ] Verify Jest config works: `bun test`
-- [ ] Add first unit test: `crypto.service.spec.ts`
-- [ ] Add first unit test: `documents.service.spec.ts`
+- [x] Verify Jest config works: `bun run test`
+- [x] Add pure unit tests: `crypto.service.spec.ts`, `qr-generator.service.spec.ts`, `turnstile.service.spec.ts`
+- [x] Add guard & strategy tests: `user-role.guard.spec.ts`, `jew.strategy.spec.ts`
+- [x] Add exhaustive Supertest HTTP integration suites: `auth.http.spec.ts`, `empleados.http.spec.ts`, `documents.http.spec.ts`, `seed.http.spec.ts`
+- [x] Implement deterministic canonical fixtures (`test/fixtures/`) with `satisfies EntityData<T>` tripwires
+- [x] Build standalone Seeder CLI (`bun run seed`) with 20 users, 19 employees, 16 schedules, 16 groups, 6 activities, 24 documents
 
 ### Phase 4: Verification
 
-- [ ] Run lint: `bunx eslint "src/**/*.ts" --fix`
-- [ ] Run tests: `bun test`
-- [ ] Run build: `bun run build`
+- [x] Run lint: `bunx eslint "src/**/*.ts" --fix`
+- [x] Run tests: `bun run test` (27 suites, 180 tests, 100% passing)
+- [x] Run build: `bun run build`
+- [x] Merge PRs #15 (Seeder), #16 (Auth & Security), #17 (Tests) into `origin/develop`
+
+---
+
+## Next Active Milestone: Frontend Dynamic Documents & Tests
+
+**Goal:** Wire frontend document views (`AdminConstanciasPage`, `ConstanciasPage`) to real backend endpoints (`/api/documents`), eliminate frontend mock data (`src/mock/`), and bootstrap Vitest test suites.
 
 ---
 

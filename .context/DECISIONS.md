@@ -227,3 +227,50 @@ School cannot spend money on hosting. Need free tier deployment.
 - ❌ Need Dockerfile for Render (D-20)
 
 **Related Debt:** D-20
+
+---
+
+## ADR-011: Strict Allowlist Projection (toSafeUser) & Universal Column Exclusions
+
+**Date:** 2026-10-25
+**Status:** Accepted (Permanent)
+
+**Context:**
+Entities accumulate sensitive columns over time (`password`, `failedLoginAttempts`, `lockedUntil`, `lastFailedAttemptAt`, `publicId`). Blacklist destructuring (`const { password, ...rest } = user`) leaks newly added sensitive columns to clients by default.
+
+**Decision:**
+1. Universal Sensitive Column Rule: All security, credential, and internal state columns declare `{ select: false }` and omit `@ApiProperty`.
+2. Strict Allowlist Projection: Service and controller response paths must explicitly map entities through an explicit projection function (`toSafeUser`), guaranteeing newly added database columns are never leaked.
+3. Standardized session check at `/auth/me` without infinite sliding-window token renewal.
+
+**Consequences:**
+- ✅ Dual-layer defense: database-level exclusion + API allowlist mapping
+- ✅ Zero risk of leaking newly added sensitive entity columns
+- ✅ Conforms to OWASP data exposure guidelines
+- ❌ New public profile fields must be explicitly added to `toSafeUser`
+
+**Related Debt:** D-03
+
+---
+
+## ADR-012: Deterministic Canonical Seeders with Schema Drift Tripwires
+
+**Date:** 2026-10-25
+**Status:** Accepted (Permanent)
+
+**Context:**
+Randomized mock data in seeders caused unstable test assertions, unique constraint collisions (empty string vs null), and drifted silently when entity definitions changed.
+
+**Decision:**
+1. Single Source of Truth: Canonical user and employee archetypes defined in `src/seed/data/*.canonical.ts`.
+2. Tripwires: All archetypes strongly bound via `satisfies EntityData<T>`. TypeScript compilation immediately fails if an entity column is added, renamed, or deleted without updating canonical data.
+3. Standalone CLI: Independent executable `bun run seed` (`src/seed/run-seed.ts`) alongside Swagger endpoint.
+4. Cascade-safe topological deletion order (`groups` before `schedules`).
+
+**Consequences:**
+- ✅ 100% deterministic local and test environment data
+- ✅ Compile-time schema drift tripwires prevent silent entity rot
+- ✅ Fast, repeatable database resets via CLI and HTTP
+- ❌ Mock data fixtures must be maintained in sync with entity changes
+
+**Related Debt:** D-05, D-11

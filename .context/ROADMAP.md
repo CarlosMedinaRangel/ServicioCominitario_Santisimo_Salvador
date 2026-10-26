@@ -112,13 +112,14 @@
 - [x] Auth Endpoint Refactoring: Standardized `/auth/check-status` to `/auth/me` without sliding cookie renewal, synced with frontend `auth.api.ts`
 - [x] Universal Sensitive Column Rule: Enforced `{ select: false }` and omitted `@ApiProperty` on internal security/audit fields across entities
 
-### Phase 2: Architecture Cleanup
+### Phase 2: Architecture Cleanup & Historical Foundations
 
 - [ ] Fix D-07: Decompose `empleados.service.ts` (851 lines -> 4 focused services: CRUD, Constancias, ExcelUpload, Activities)
 - [x] Fix D-27: Change bcrypt.hashSync to async (Fully verified across auth, empleados, and seeders)
 - [ ] Fix D-28: Add atomic transaction (`dataSource.transaction` / `QueryRunner`) and bulk optimization to Excel `uploadFile`
 - [ ] Fix D-29: Create custom repository classes extending `Repository<T>` for domain queries (aligned with D-07 decomposition)
 - [ ] Fix D-09: Extract `ConstanciaService` (isolate pdfmake reports and cryptographic QR seal issuance from employee CRUD)
+- [ ] Implement `AcademicPeriod` entity (Year/Lapso) to historically bind `schedules` and `groups` (Advanced from Phase 6 to establish clean relational foundations before real XLS data arrival)
 
 ### Phase 3: Real Data Integration
 
@@ -146,7 +147,7 @@
 
 - [ ] Resolve all `pre-student-blocker` debt
 - [ ] Design Student/Representative entities
-- [ ] Create AcademicPeriod entity
+- [x] Create AcademicPeriod entity (Advanced to Phase 2)
 - [ ] Add student document types
 - [ ] Build student registration flow
 
@@ -173,5 +174,6 @@
 - Streaming XLSX import for large files
 - Employee career history table
 - Monthly activities breakdown table in constancia report (Protected in `src/reports/constanciaMensual.report.ts` via `AI_PRESERVE_FEATURE` until historical activity recording is fully standardized)
-- Academic period management
-- Payroll receipts module
+- Academic period management (Advanced to Phase 2)
+- Payroll receipts module (Periodic monthly issuance)
+- Optional DB-level snapshot integrity hash (embedding `sha256(metadata)` in QR token to detect unauthorized direct SQL modifications in DB)
