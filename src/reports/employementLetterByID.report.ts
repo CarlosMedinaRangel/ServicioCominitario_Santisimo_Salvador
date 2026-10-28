@@ -9,19 +9,22 @@ import { DocumentVerification } from 'src/documents/entities/document-verificati
 
 const styles: StyleDictionary = {
   header: {
-    fontSize: 20,
+    fontSize: 18,
     bold: true,
     alignment: 'center',
-    margin: [0, 25, 0, 25],
+    margin: [0, 15, 0, 25],
+    color: '#0f172a',
   },
   body: {
     alignment: 'justify',
-    lineHeight: 1.35,
+    lineHeight: 1.5,
     fontSize: 11,
+    color: '#1e293b',
   },
   signature: {
     fontSize: 11,
     bold: true,
+    color: '#0f172a',
   },
 };
 
@@ -35,6 +38,7 @@ interface ReportProps {
   employeeHours: Employee['hours_per_day'];
   employeeWorkSchedule: Employee['work_schedule'];
   employerCompany: string;
+  issueDate?: Date | string;
   qrDataUrl?: string;
   verificationId?: DocumentVerification['id'];
 }
@@ -52,19 +56,36 @@ export const employementLetterReportByID = (
     employerCompany,
     employerName,
     employerPosition,
+    issueDate,
     qrDataUrl,
     verificationId,
   } = Props;
 
-  const docDefinition: TDocumentDefinitions = {
-    styles: styles,
-    pageMargins: [40, 40, 40, 40],
+  const targetDate = issueDate ? new Date(issueDate) : new Date();
+  const formattedIssueDate = DateFormatter.getDDMMMMYYYY(targetDate);
+  const formattedCedula = DateFormatter.formatCedulaHyphen(employeeCedula);
+  const documentTitle = `Constancia de Trabajo (${formattedIssueDate}) - ${employeeName} ${formattedCedula}`.trim();
 
-    header: headerSection({ showLogo: true, ShowDate: true }),
+  const docDefinition: TDocumentDefinitions = {
+    info: {
+      title: documentTitle,
+      author: employerCompany,
+      subject: `Constancia de Trabajo para ${employeeName} (${formattedCedula})`,
+    },
+    pageSize: 'LETTER',
+    pageMargins: [50, 45, 50, 45],
+    styles: styles,
+
+    header: headerSection({
+      showLogo: true,
+      ShowDate: true,
+      date: targetDate,
+      city: 'San Cristóbal',
+    }),
 
     content: [
       {
-        text: 'CONSTANCIA DE EMPLEO',
+        text: 'CONSTANCIA DE TRABAJO',
         style: 'header',
       },
       {
@@ -82,28 +103,28 @@ export const employementLetterReportByID = (
           `.`,
         ],
         style: 'body',
-        margin: [0, 0, 0, 16],
+        margin: [0, 0, 0, 20],
       },
       {
         text: `La jornada laboral del Sr./Sra. ${employeeName} es de ${employeeHours} horas semanales, con un horario de ${employeeWorkSchedule}, cumpliendo a cabalidad con las políticas y procedimientos establecidos por la institución.`,
         style: 'body',
-        margin: [0, 0, 0, 16],
+        margin: [0, 0, 0, 20],
       },
       {
         text: `Esta constancia se expide a solicitud de la parte interesada para los fines que considere convenientes.`,
         style: 'body',
-        margin: [0, 0, 0, 40],
+        margin: [0, 0, 0, 50],
       },
       {
         columns: [
           {
             width: '*',
             stack: [
-              { text: 'Atentamente,', style: 'signature', margin: [0, 0, 0, 16] },
+              { text: 'Atentamente,', style: 'signature', margin: [0, 0, 0, 25] },
               { text: employerName, style: 'signature' },
-              { text: employerPosition, fontSize: 10, italics: true },
-              { text: employerCompany, fontSize: 10 },
-              { text: DateFormatter.getDDMMMMYYYY(new Date()), fontSize: 9, color: '#64748b', margin: [0, 4, 0, 0] },
+              { text: employerPosition, fontSize: 10, italics: true, color: '#334155' },
+              { text: employerCompany, fontSize: 10, color: '#334155' },
+              { text: formattedIssueDate, fontSize: 9, color: '#64748b', margin: [0, 6, 0, 0] },
             ],
           },
           qrDataUrl
@@ -142,7 +163,7 @@ export const employementLetterReportByID = (
               }
             : { width: 0, text: '' },
         ],
-        margin: [0, 10, 0, 0],
+        margin: [0, 20, 0, 0],
       },
     ],
   };

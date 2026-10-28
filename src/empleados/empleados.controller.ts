@@ -174,6 +174,16 @@ export class EmpleadosController {
   })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 20 })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Búsqueda por nombre, email o cédula de identidad',
+  })
+  @ApiQuery({
+    name: 'position',
+    required: false,
+    description: 'Filtro por cargo institucional',
+  })
   @ApiResponse({
     status: 200,
     description: 'Lista de empleados obtenida con éxito.',
@@ -183,7 +193,12 @@ export class EmpleadosController {
     @Query('status') status?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('search') search?: string,
+    @Query('position') position?: string,
   ) {
+    if (search !== undefined || position !== undefined) {
+      return this.empleadosService.findAll(status, page, limit, search, position);
+    }
     return this.empleadosService.findAll(status, page, limit);
   }
 
@@ -245,27 +260,6 @@ export class EmpleadosController {
     return this.empleadosService.findActivities(id);
   }
 
-  @Post(':id/activities/seed')
-  @Auth(ValidRoles.admin)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Generar actividades de prueba para un empleado en un mes',
-  })
-  @ApiQuery({
-    name: 'month',
-    required: false,
-    description: 'Mes en formato YYYY-MM (default: mes actual)',
-    example: '2026-07',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Actividades de prueba generadas.',
-  })
-  seedActivities(@Param('id') id: string, @Query('month') month?: string) {
-    const targetMonth = month || new Date().toISOString().slice(0, 7);
-    return this.empleadosService.seedActivities(id, targetMonth);
-  }
-
   @Get('Constancia-Empleado/:id')
   @Auth()
   @ApiBearerAuth()
@@ -302,6 +296,12 @@ export class EmpleadosController {
     description: 'Nombre de la institución (default: Santisimo Salvador)',
     example: 'Colegio Santisimo Salvador',
   })
+  @ApiQuery({
+    name: 'documentId',
+    required: false,
+    description:
+      'UUID del registro DocumentVerification para reconstruir documento con su sello criptográfico inalterable',
+  })
   @ApiProduces('application/pdf')
   @ApiResponse({
     status: 200,
@@ -319,18 +319,34 @@ export class EmpleadosController {
     @Query('employerName') employerName?: string,
     @Query('employerPosition') employerPosition?: string,
     @Query('employerCompany') employerCompany?: string,
+    @Query('documentId') documentId?: string,
   ) {
     const pdfDoc = await this.empleadosService.ConstanciaEmpleadoByID(id, {
       month,
       employerName,
       employerPosition,
       employerCompany,
+      documentId,
     });
 
     response.setHeader('Content-Type', 'application/pdf');
-    pdfDoc.info.Title = month
-      ? `constancia-${month}.pdf`
-      : 'employment-letter.pdf';
+    const docTitle =
+      pdfDoc.info?.Title && pdfDoc.info.Title !== 'employment-letter.pdf'
+        ? pdfDoc.info.Title
+        : month
+          ? `Constancia de Trabajo Mensual (${month})`
+          : 'Constancia de Trabajo';
+    pdfDoc.info.Title = docTitle;
+    const safeFilename = docTitle
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9_\-.() ]/g, '')
+      .trim();
+    const encodedFilename = encodeURIComponent(`${docTitle}.pdf`);
+    response.setHeader(
+      'Content-Disposition',
+      `inline; filename="${safeFilename}.pdf"; filename*=UTF-8''${encodedFilename}`,
+    );
     pdfDoc.pipe(response);
     pdfDoc.end();
   }
