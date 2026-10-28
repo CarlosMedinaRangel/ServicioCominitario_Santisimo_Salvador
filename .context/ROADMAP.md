@@ -106,7 +106,9 @@
 - [x] Fix D-22: Move RegisterAction to correct layer (Resolved in src/api/auth.api.ts)
 - [x] Fix D-31: Add backward options/arrows in Edit Employee and Profile flows (Resolved in frontend)
 - [ ] Fix D-32: Adapt platform UI for desktop/tablet screens (currently mobile-only focused)
-- [ ] Fix D-33: Adapt frontend Zod schemas (`src/schemas/`) to handle structured paginated wrapper (`{ data: T[], total, page, totalPages }`) for `/empleados` and `/documents`
+- [x] Fix D-33: Adapt frontend Zod schemas (`src/schemas/`) to handle structured paginated wrapper (`{ data: T[], total, page, totalPages }`) for `/empleados` and `/documents`
+- [x] Dynamic Documents & Queries: Endpoints `/documents` and `/documents/recipient/:id` wired to real PostgreSQL server-side queries with pagination, text search (`recipientName`/`recipientIdentifier` and `issuedByName`), filters (`status`, `documentType`), and date ranges (`from`/`to`)
+- [x] Dynamic Document Naming & Metadata: Standardized document title and download file naming convention `<Tipo de Doc> (<Dia Mes Año>) - <Nombre Destinatario> <Cedula Parseada>` across pdfmake reports, backend Content-Disposition headers, and client programmatic downloads
 - [x] Fix D-11: Bootstrap backend test infrastructure (27 Jest & Supertest suites, 180 tests covering Crypto, Documents, Turnstile, Auth, Roles, Cookies, Employees soft-delete/carnet/schedules/reports/pagination/Excel)
 - [x] Standalone Seeder CLI: Deterministic canonical data (`satisfies EntityData<T>`), CLI script `bun run seed`, schema drift tripwires, and null-safe unique column constraints
 - [x] Auth Endpoint Refactoring: Standardized `/auth/check-status` to `/auth/me` without sliding cookie renewal, synced with frontend `auth.api.ts`
@@ -164,6 +166,7 @@
 | 2026-10-19 | Platform UI is currently adapted primarily for mobile only; desktop/tablet responsive layout needed | Global Frontend UI | Logged |
 | 2026-10-19 | Study fallback employer defaults (D-17): determine whether signatories should be directory/high-member staff or team members, and configure via env vars | Document Generation | To Study |
 | 2026-10-19 | Study constancia wording vs. DB schema: check whether employeeHours (Employee.hours_per_day) should say "horas diarias" or be calculated as "horas semanales" | Document Reports | To Study |
+| 2026-10-28 | In `activity-service.service.spec.ts` line 80, `expect(service.log()).resolves.not.toThrow()` throws in Bun Test because `.resolves` unwraps `undefined` (should be `await expect(service.log()).resolves.toBeUndefined()`) | Test Suite (`activity-service.service.spec.ts`) | Logged |
 
 ---
 

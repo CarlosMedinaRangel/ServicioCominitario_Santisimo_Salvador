@@ -34,7 +34,7 @@ import {
 
 export const CANONICAL_ELENA_DOCUMENTS: EntityData<DocumentVerification>[] = [
   {
-    id: 'd0000000-0000-0000-0000-000000000001',
+    id: 'd0000000-0000-4000-8000-000000000001',
     documentType: DocumentType.CONSTANCIA_TRABAJO,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_ELENA_USER.id,
@@ -54,7 +54,7 @@ export const CANONICAL_ELENA_DOCUMENTS: EntityData<DocumentVerification>[] = [
     updatedAt: new Date('2025-10-15T09:30:00.000Z'),
   },
   {
-    id: 'd0000000-0000-0000-0000-000000000002',
+    id: 'd0000000-0000-4000-8000-000000000002',
     documentType: DocumentType.SOLVENCIA_ADMINISTRATIVA,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_ELENA_USER.id,
@@ -72,7 +72,7 @@ export const CANONICAL_ELENA_DOCUMENTS: EntityData<DocumentVerification>[] = [
     updatedAt: new Date('2026-01-10T14:15:00.000Z'),
   },
   {
-    id: 'd0000000-0000-0000-0000-000000000003',
+    id: 'd0000000-0000-4000-8000-000000000003',
     documentType: DocumentType.RECIBO_PAGO,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_ELENA_USER.id,
@@ -93,7 +93,7 @@ export const CANONICAL_ELENA_DOCUMENTS: EntityData<DocumentVerification>[] = [
 
 export const CANONICAL_CARLOS_DOCUMENTS: EntityData<DocumentVerification>[] = [
   {
-    id: 'd0000000-0000-0000-0000-000000000004',
+    id: 'd0000000-0000-4000-8000-000000000004',
     documentType: DocumentType.CONSTANCIA_TRABAJO,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_CARLOS_USER.id,
@@ -113,7 +113,7 @@ export const CANONICAL_CARLOS_DOCUMENTS: EntityData<DocumentVerification>[] = [
     updatedAt: new Date('2025-11-05T08:00:00.000Z'),
   },
   {
-    id: 'd0000000-0000-0000-0000-000000000005',
+    id: 'd0000000-0000-4000-8000-000000000005',
     documentType: DocumentType.SOLVENCIA_ADMINISTRATIVA,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_CARLOS_USER.id,
@@ -131,7 +131,7 @@ export const CANONICAL_CARLOS_DOCUMENTS: EntityData<DocumentVerification>[] = [
     updatedAt: new Date('2026-01-20T11:45:00.000Z'),
   },
   {
-    id: 'd0000000-0000-0000-0000-000000000006',
+    id: 'd0000000-0000-4000-8000-000000000006',
     documentType: DocumentType.CONSTANCIA_TRABAJO,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_CARLOS_USER.id,
@@ -152,7 +152,7 @@ export const CANONICAL_CARLOS_DOCUMENTS: EntityData<DocumentVerification>[] = [
 
 export const CANONICAL_ANA_DOCUMENTS: EntityData<DocumentVerification>[] = [
   {
-    id: 'd0000000-0000-0000-0000-000000000007',
+    id: 'd0000000-0000-4000-8000-000000000007',
     documentType: DocumentType.CONSTANCIA_TRABAJO,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_ANA_USER.id,
@@ -172,7 +172,7 @@ export const CANONICAL_ANA_DOCUMENTS: EntityData<DocumentVerification>[] = [
     updatedAt: new Date('2025-09-22T10:30:00.000Z'),
   },
   {
-    id: 'd0000000-0000-0000-0000-000000000008',
+    id: 'd0000000-0000-4000-8000-000000000008',
     documentType: DocumentType.SOLVENCIA_ADMINISTRATIVA,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_ANA_USER.id,
@@ -190,7 +190,7 @@ export const CANONICAL_ANA_DOCUMENTS: EntityData<DocumentVerification>[] = [
     updatedAt: new Date('2026-02-01T15:20:00.000Z'),
   },
   {
-    id: 'd0000000-0000-0000-0000-000000000009',
+    id: 'd0000000-0000-4000-8000-000000000009',
     documentType: DocumentType.RECIBO_PAGO,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_ANA_USER.id,
@@ -211,7 +211,7 @@ export const CANONICAL_ANA_DOCUMENTS: EntityData<DocumentVerification>[] = [
 
 export const CANONICAL_INACTIVE_DOCUMENTS: EntityData<DocumentVerification>[] = [
   {
-    id: 'd0000000-0000-0000-0000-000000000010',
+    id: 'd0000000-0000-4000-8000-000000000010',
     documentType: DocumentType.CONSTANCIA_TRABAJO,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_INACTIVE_USER.id,
@@ -230,7 +230,7 @@ export const CANONICAL_INACTIVE_DOCUMENTS: EntityData<DocumentVerification>[] = 
     updatedAt: new Date('2024-07-15T09:00:00.000Z'),
   },
   {
-    id: 'd0000000-0000-0000-0000-000000000011',
+    id: 'd0000000-0000-4000-8000-000000000011',
     documentType: DocumentType.SOLVENCIA_ADMINISTRATIVA,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_INACTIVE_USER.id,
@@ -248,7 +248,7 @@ export const CANONICAL_INACTIVE_DOCUMENTS: EntityData<DocumentVerification>[] = 
     updatedAt: new Date('2024-07-20T11:00:00.000Z'),
   },
   {
-    id: 'd0000000-0000-0000-0000-000000000012',
+    id: 'd0000000-0000-4000-8000-000000000012',
     documentType: DocumentType.OTRO,
     recipientType: RecipientType.EMPLOYEE,
     recipientId: CANONICAL_INACTIVE_USER.id,

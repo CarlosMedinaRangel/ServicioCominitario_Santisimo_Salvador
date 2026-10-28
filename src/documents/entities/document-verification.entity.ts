@@ -5,8 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  ManyToOne,
+  JoinColumn,
+  type Relation,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { User } from '../../auth/entities/auth.entity';
 
 export enum DocumentType {
   CONSTANCIA_TRABAJO = 'CONSTANCIA_TRABAJO',
@@ -50,10 +54,14 @@ export class DocumentVerification {
   })
   recipientType: RecipientType;
 
-  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
-  @Column({ type: 'varchar', length: 255 })
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000', required: false })
+  @Column({ type: 'uuid', nullable: true })
   @Index()
-  recipientId: string;
+  recipientId?: string;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'recipientId' })
+  recipientUser?: Relation<User>;
 
   @ApiProperty({ example: 'V-18234567' })
   @Column({ type: 'varchar', length: 50 })
@@ -65,12 +73,16 @@ export class DocumentVerification {
   recipientName: string;
 
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440001', required: false })
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   issuedByUserId?: string;
 
-  @ApiProperty({ example: 'Director General', required: false })
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  issuedByName?: string;
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'issuedByUserId' })
+  issuedByUser?: Relation<User>;
+
+  @ApiProperty({ example: 'Director General' })
+  @Column({ type: 'varchar', length: 255 })
+  issuedByName: string;
 
   @ApiProperty({ enum: DocumentStatus, example: DocumentStatus.VALID })
   @Column({

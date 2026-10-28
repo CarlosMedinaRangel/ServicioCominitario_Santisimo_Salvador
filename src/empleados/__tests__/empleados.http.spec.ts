@@ -59,7 +59,6 @@ describe('EmpleadosController (Exhaustive HTTP Integration with Supertest)', () 
       findSchedules: jest.fn(),
       findGroups: jest.fn(),
       findActivities: jest.fn(),
-      seedActivities: jest.fn(),
       uploadFile: jest.fn(),
       ConstanciaEmpleadoByID: jest.fn(),
     };

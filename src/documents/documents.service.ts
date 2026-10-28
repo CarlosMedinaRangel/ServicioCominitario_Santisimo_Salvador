@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike, Between } from 'typeorm';
 import {
   DocumentVerification,
   DocumentType,
@@ -92,7 +92,7 @@ export class DocumentsService {
       recipientIdentifier: params.recipientIdentifier,
       recipientName: params.recipientName,
       issuedByUserId: params.issuedByUserId,
-      issuedByName: params.issuedByName,
+      issuedByName: params.issuedByName || 'Autoservicio',
       metadata: params.metadata,
       verificationCode,
       status: DocumentStatus.VALID,
@@ -250,6 +250,20 @@ export class DocumentsService {
   }
 
   /**
+   * Finds a single document verification by UUID.
+   */
+  async findOne(id: string): Promise<DocumentVerification | null> {
+    return this.docVerificationRepo.findOne({ where: { id } });
+  }
+
+  /**
+   * Re-generates QR Data URL for an existing verification code.
+   */
+  async getQrDataUrl(verificationCode: string): Promise<string> {
+    return this.qrGeneratorService.generateDataUrl(verificationCode);
+  }
+
+  /**
    * Revokes an existing issued document.
    */
   async revokeDocument(id: string): Promise<DocumentVerification> {
@@ -263,28 +277,62 @@ export class DocumentsService {
   }
 
   /**
-   * Lists verifications for a specific recipient.
+   * Lists verifications for a specific recipient with optional filtering and pagination.
    */
-  async findByRecipient(recipientId: string): Promise<DocumentVerification[]> {
-    return this.docVerificationRepo.find({
-      where: { recipientId },
-      order: { issuedAt: 'DESC' },
-    });
-  }
+  async findByRecipient(
+    recipientId: string,
+    options?: {
+      status?: DocumentStatus;
+      page?: number;
+      limit?: number;
+      documentType?: DocumentType;
+      search?: string;
+      from?: string;
+      to?: string;
+    },
+  ): Promise<{ data: DocumentVerification[]; total: number; page: number; totalPages: number } | DocumentVerification[]> {
+    const isPaginated =
+      options?.page !== undefined ||
+      options?.limit !== undefined ||
+      options?.search !== undefined ||
+      options?.documentType !== undefined ||
+      options?.from !== undefined ||
+      options?.to !== undefined ||
+      options?.status !== undefined;
 
-  /**
-   * Lists all issued document verifications with optional filtering and pagination.
-   */
-  async findAll(options?: {
-    status?: DocumentStatus;
-    page?: number;
-    limit?: number;
-  }): Promise<{ data: DocumentVerification[]; total: number; page: number; totalPages: number }> {
+    if (!isPaginated) {
+      return this.docVerificationRepo.find({
+        where: { recipientId },
+        order: { issuedAt: 'DESC' },
+      });
+    }
+
     const page = Math.max(1, Number(options?.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(options?.limit) || 20));
     const skip = (page - 1) * limit;
 
-    const where = options?.status ? { status: options.status } : {};
+    const baseWhere: any = { recipientId };
+    if (options?.status) {
+      baseWhere.status = options.status;
+    }
+    if (options?.documentType && (options.documentType as any) !== 'Todos') {
+      baseWhere.documentType = options.documentType;
+    }
+    if (options?.from || options?.to) {
+      const fromDate = options?.from ? new Date(options.from) : new Date(0);
+      const toDate = options?.to ? new Date(options.to) : new Date('2099-12-31T23:59:59.999Z');
+      baseWhere.issuedAt = Between(fromDate, toDate);
+    }
+
+    let where: any = baseWhere;
+    const trimmed = options?.search?.trim();
+    if (trimmed) {
+      // Requisito 1.2: En /constancias, buscar por emisor / quien lo emitió
+      where = {
+        ...baseWhere,
+        issuedByName: ILike(`%${trimmed}%`),
+      };
+    }
 
     const [data, total] = await this.docVerificationRepo.findAndCount({
       where,
@@ -297,7 +345,78 @@ export class DocumentsService {
       data,
       total,
       page,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  }
+
+  /**
+   * Lists all issued document verifications with optional filtering and pagination.
+   */
+  async findAll(options?: {
+    status?: DocumentStatus;
+    page?: number;
+    limit?: number;
+    documentType?: DocumentType;
+    search?: string;
+    from?: string;
+    to?: string;
+  }): Promise<{ data: DocumentVerification[]; total: number; page: number; totalPages: number }> {
+    const page = Math.max(1, Number(options?.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(options?.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const baseWhere: any = {};
+    if (options?.status) {
+      baseWhere.status = options.status;
+    }
+    if (options?.documentType && (options.documentType as any) !== 'Todos') {
+      baseWhere.documentType = options.documentType;
+    }
+    if (options?.from || options?.to) {
+      const fromDate = options?.from ? new Date(options.from) : new Date(0);
+      const toDate = options?.to ? new Date(options.to) : new Date('2099-12-31T23:59:59.999Z');
+      baseWhere.issuedAt = Between(fromDate, toDate);
+    }
+
+    let where: any = baseWhere;
+    const trimmed = options?.search?.trim();
+    if (trimmed) {
+      const cleanSearch = `%${trimmed}%`;
+      const isCedulaPattern = /^[VEJG]?[-.\s]*\d[\d.\s]*$/i.test(trimmed);
+      const rawDigits = trimmed.replace(/\D/g, '');
+
+      // Requisito 1.1: Búsqueda por input restringida estrictamente al destinatario
+      const searchConditions: any[] = [
+        { ...baseWhere, recipientName: ILike(cleanSearch) },
+      ];
+
+      if (isCedulaPattern && rawDigits) {
+        searchConditions.push(
+          { ...baseWhere, recipientIdentifier: ILike(`%${rawDigits}%`) },
+          { ...baseWhere, recipientIdentifier: ILike(cleanSearch) },
+        );
+      } else {
+        searchConditions.push({
+          ...baseWhere,
+          recipientIdentifier: ILike(cleanSearch),
+        });
+      }
+
+      where = searchConditions;
+    }
+
+    const [data, total] = await this.docVerificationRepo.findAndCount({
+      where,
+      order: { issuedAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return {
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit) || 1,
     };
   }
 

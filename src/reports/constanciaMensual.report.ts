@@ -124,7 +124,15 @@ export const constanciaMensualReport = (
     { text: a.detalle || '-', style: 'tableCell' },
   ]);
 
+  const formattedCedula = DateFormatter.formatCedulaHyphen(employeeCedula);
+  const documentTitle = `Constancia de Trabajo Mensual (${DateFormatter.getDDMMMMYYYY(new Date())}) - ${employeeName} ${formattedCedula}`.trim();
+
   const docDefinition: TDocumentDefinitions = {
+    info: {
+      title: documentTitle,
+      author: employerCompany,
+      subject: `Constancia de Trabajo Mensual para ${employeeName} (${formattedCedula})`,
+    },
     styles,
     pageMargins: [40, 45, 40, 45],
     header: headerSection({ showLogo: true, ShowDate: true }),

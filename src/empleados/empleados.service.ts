@@ -8,7 +8,7 @@ import {
 import { CreateEmpleadoDto } from './dto/create-empleado.dto';
 import { UpdateEmpleadoDto } from './dto/update-empleado.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, DataSource, In } from 'typeorm';
+import { Repository, Between, DataSource, In, ILike } from 'typeorm';
 import { Employee } from './entities/employee.entity';
 import { Schedule } from './entities/schedule.entity';
 import { Group } from './entities/group.entity';
@@ -19,7 +19,7 @@ import { PrinterService } from 'src/printer/printer.service';
 import { employementLetterReportByID } from 'src/reports/employementLetterByID.report';
 import { constanciaMensualReport } from 'src/reports/constanciaMensual.report';
 import { DocumentsService } from 'src/documents/documents.service';
-import { DocumentType, RecipientType } from 'src/documents/entities/document-verification.entity';
+import { DocumentType, RecipientType, DocumentStatus } from 'src/documents/entities/document-verification.entity';
 import { CryptoService } from 'src/crypto/crypto.service';
 import * as bcrypt from 'bcrypt';
 import * as XLSX from 'xlsx';
@@ -122,12 +122,72 @@ export class EmpleadosService {
     });
   }
 
-  async findAll(status?: string, page?: number, limit?: number) {
-    let whereCondition: any = { user: { isActive: true } };
-    if (status === 'all') {
-      whereCondition = {};
-    } else if (status === 'inactive') {
-      whereCondition = { user: { isActive: false } };
+  async findAll(
+    status?: string,
+    page?: number,
+    limit?: number,
+    search?: string,
+    position?: string,
+  ) {
+    const baseUserWhere: any = {};
+    if (status === 'inactive') {
+      baseUserWhere.isActive = false;
+    } else if (status !== 'all') {
+      baseUserWhere.isActive = true;
+    }
+
+    let whereCondition: any;
+    const trimmedSearch = search?.trim();
+
+    if (trimmedSearch) {
+      const cleanSearch = `%${trimmedSearch}%`;
+      const isCedulaPattern =
+        /^[VEJG]?[-.\s]*\d[\d.\s]*$/i.test(trimmedSearch);
+      const rawDigits = trimmedSearch.replace(/\D/g, '');
+
+      const positionFilter =
+        position && position !== 'Todos' ? { position } : {};
+
+      const searchConditions: any[] = [
+        {
+          ...positionFilter,
+          user: { ...baseUserWhere, fullName: ILike(cleanSearch) },
+        },
+        {
+          ...positionFilter,
+          user: { ...baseUserWhere, email: ILike(cleanSearch) },
+        },
+      ];
+
+      if (isCedulaPattern && rawDigits) {
+        searchConditions.push(
+          {
+            ...positionFilter,
+            user: { ...baseUserWhere, cedula: ILike(`%${rawDigits}%`) },
+          },
+          {
+            ...positionFilter,
+            user: { ...baseUserWhere, cedula: ILike(cleanSearch) },
+          },
+        );
+      } else {
+        searchConditions.push({
+          ...positionFilter,
+          user: { ...baseUserWhere, cedula: ILike(cleanSearch) },
+        });
+      }
+
+      whereCondition = searchConditions;
+    } else if (position && position !== 'Todos') {
+      whereCondition = {
+        position,
+        ...(Object.keys(baseUserWhere).length > 0
+          ? { user: baseUserWhere }
+          : {}),
+      };
+    } else {
+      whereCondition =
+        Object.keys(baseUserWhere).length > 0 ? { user: baseUserWhere } : {};
     }
 
     // Modo paginado si se pasa 'page'
@@ -256,6 +316,7 @@ export class EmpleadosService {
       employerName?: string;
       employerPosition?: string;
       employerCompany?: string;
+      documentId?: string;
     },
   ) {
     const employee = await this.findOne(id);
@@ -265,9 +326,39 @@ export class EmpleadosService {
     const employerPosition = options?.employerPosition || 'Director';
     const employerCompany = options?.employerCompany || 'Santisimo Salvador';
 
-    // Generate cryptographic QR verification seal and save record
-    const { record: docRecord, qrDataUrl } =
-      await this.documentsService.issueDocument({
+    let docRecordId: string;
+    let qrDataUrl: string;
+    let effectiveIssueDate: Date | string;
+
+    if (options?.documentId) {
+      // 1. Reconstruir documento existente desde el registro criptográfico
+      const existing = await this.documentsService.findOne(options.documentId);
+      if (!existing) {
+        throw new NotFoundException(
+          `Documento con ID ${options.documentId} no encontrado.`,
+        );
+      }
+      if (existing.status === DocumentStatus.REVOKED) {
+        throw new BadRequestException(
+          'No se puede generar la constancia de un documento revocado o anulado.',
+        );
+      }
+
+      // 2. Desencriptar sello criptográfico AES-256-GCM para verificar integridad y extraer fecha inalterable
+      const payload = this.cryptoService.decryptPayload(
+        existing.verificationCode,
+        'DOC',
+      );
+      effectiveIssueDate = payload.issuedAt || existing.issuedAt;
+
+      // 3. Regenerar QR desde el sello existente sin duplicar registros en base de datos
+      qrDataUrl = await this.documentsService.getQrDataUrl(
+        existing.verificationCode,
+      );
+      docRecordId = existing.id;
+    } else {
+      // Emisión de documento nuevo (ej. desde modal de administración)
+      const issued = await this.documentsService.issueDocument({
         documentType: DocumentType.CONSTANCIA_TRABAJO,
         recipientType: RecipientType.EMPLOYEE,
         recipientId: employee.userId,
@@ -283,6 +374,10 @@ export class EmpleadosService {
           mes: options?.month || null,
         },
       });
+      docRecordId = issued.record.id;
+      qrDataUrl = issued.qrDataUrl;
+      effectiveIssueDate = issued.record.issuedAt;
+    }
 
     if (options?.month) {
       const [yearStr, monthStr] = options.month.split('-');
@@ -312,7 +407,7 @@ export class EmpleadosService {
         employeeWorkSchedule: employee.work_schedule,
         month: `${monthStr}-${yearStr}`,
         qrDataUrl,
-        verificationId: docRecord.id,
+        verificationId: docRecordId,
         activities: activities.map((a) => ({
           tipo: a.tipo,
           descripcion: a.descripcion,
@@ -343,7 +438,8 @@ export class EmpleadosService {
       employeeHours: employee.hours_per_day,
       employeeWorkSchedule: employee.work_schedule,
       qrDataUrl,
-      verificationId: docRecord.id,
+      verificationId: docRecordId,
+      issueDate: effectiveIssueDate,
     });
 
     const pdf = this.PrinterService.createPdf(docDefinition);
@@ -777,70 +873,6 @@ export class EmpleadosService {
     return `${match[1].padStart(2, '0')}:${match[2]}`;
   }
 
-  async seedActivities(employeeId: string, month: string) {
-    const employee = await this.findOne(employeeId);
-
-    const [yearStr, monthStr] = month.split('-');
-    const year = parseInt(yearStr, 10);
-    const mes = parseInt(monthStr, 10);
-
-    const activityTypes = [
-      'Clase Impartida',
-      'Reunión',
-      'Corrección de Evaluaciones',
-      'Planificación',
-      'Laboratorio',
-      'Tutoría',
-    ];
-    const descriptions = [
-      'Matemáticas Básicas',
-      'Biología Molecular',
-      'Historia Universal',
-      'Lengua y Literatura',
-      'Física General',
-      'Química Orgánica',
-      'Inglés Avanzado',
-      'Educación Física',
-      'Arte y Cultura',
-    ];
-    const details = [
-      'Grupo A',
-      'Grupo B',
-      'Grupo C',
-      'Salón 101',
-      'Salón 203',
-      'Laboratorio 1',
-      'Aula Virtual',
-      'Biblioteca',
-    ];
-
-    const activities: Activity[] = [];
-    const count = 3 + Math.floor(Math.random() * 3);
-
-    for (let i = 0; i < count; i++) {
-      const day = 1 + Math.floor(Math.random() * 28);
-      const hour = 7 + Math.floor(Math.random() * 10);
-      const timestamp = new Date(year, mes - 1, day, hour, 0, 0);
-
-      const tipo =
-        activityTypes[Math.floor(Math.random() * activityTypes.length)];
-      const descripcion =
-        descriptions[Math.floor(Math.random() * descriptions.length)];
-      const detalle = details[Math.floor(Math.random() * details.length)];
-
-      const activity = this.activityRepository.create({
-        employeeId: employee.userId,
-        tipo,
-        descripcion,
-        detalle,
-        timestamp,
-        destacada: Math.random() > 0.7,
-      });
-      activities.push(activity);
-    }
-
-    return this.activityRepository.save(activities);
-  }
 
   private handleExceptions(error: IErrorsTypeORM) {
     if (error.code === '23505') throw new BadRequestException(error.detail);

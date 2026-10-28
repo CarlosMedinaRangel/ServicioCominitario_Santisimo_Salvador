@@ -231,12 +231,13 @@ export const verificationSchema = z.object({
 
 ## Testing Checklist
 
-- [ ] Unit test: Crypto encrypt/decrypt roundtrip
-- [ ] Unit test: Token inspection (valid/invalid headers)
-- [ ] Unit test: Document issue flow
-- [ ] Unit test: Document verify flow (valid/revoked/counterfeit)
-- [ ] Unit test: Document revoke flow
-- [ ] Integration test: Constancia generation endpoint
-- [ ] Integration test: Verification endpoint
-- [ ] E2E test: Generate constancia → verify QR
-- [ ] E2E test: Revoke document → verify shows REVOKED
+- [x] Unit test: Crypto encrypt/decrypt roundtrip (`crypto.service.spec.ts`)
+- [x] Unit test: Token inspection (valid/invalid headers) (`documents.verify.spec.ts`)
+- [x] Unit test: Document issue flow (`documents.issue.spec.ts`)
+- [x] Unit test: Document verify flow (valid/revoked/counterfeit) (`documents.verify.spec.ts`)
+- [x] Unit test: Document revoke flow (`documents.query.spec.ts`)
+- [x] Integration test: Constancia generation endpoint (`empleados.http.spec.ts`, `empleados.reports.spec.ts`)
+- [x] Integration test: Verification endpoint (`documents.http.spec.ts`)
+- [x] Integration test: Recipient documents endpoint with authorization (`documents.http.spec.ts`)
+- [x] E2E test: Generate constancia → verify QR seal roundtrip (`empleados.reports.spec.ts`)
+- [x] E2E test: Revoke document → verify shows REVOKED (`documents.http.spec.ts`)

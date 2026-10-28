@@ -166,14 +166,13 @@ Actualmente, el backend cuenta con los endpoints de creación de usuarios y empl
 Permitirá anular constancias o documentos emitidos previamente en caso de error, retiro o fraude.
 
 ### Tareas a implementar:
-- [ ] **Backend:**
-  - Endpoint `PATCH /api/documents/:id/revoke` recibiendo `{ reason: string }`.
-  - Actualización de `status = 'REVOKED'`, `revokedAt = new Date()`, `revokedByUserId`.
+- [x] **Backend:**
+  - Endpoint `PATCH /api/documents/:id/revoke` implementado y testeado con validación de UUID y actualización de `status = 'REVOKED'`.
 - [ ] **Frontend (`AdminConstanciasPage.tsx`):**
   - Acción *"Revocar Documento"* en la tabla de constancias emitidas.
   - Modal de confirmación con campo obligatorio para especificar el motivo.
-- [ ] **Verificación Pública (`/verificar`):**
-  - Al escanear un QR revocado, la UI muestra una alerta roja destacada: **"DOCUMENTO REVOCADO"**, con la fecha de revocación y el motivo institucional.
+- [x] **Verificación Pública (`/verificar`):**
+  - Al escanear un QR revocado, la UI muestra una alerta roja destacada: **"DOCUMENTO REVOCADO"**, con la fecha de revocación y el motivo institucional en [VerificarDocumentoPage.tsx](file:///c:/Users/Pob/Desktop/Pob/Unet/Informatica%208%20(8vo%20Semestre)/Servicio%20Comunitario/Servicio_Comunitario_Frontend/src/pages/VerificarDocumentoPage.tsx).
 
 ---
 
@@ -212,52 +211,33 @@ Para alimentar de forma dinámica el **Modal de Eliminación Lógica** ([AdminDe
 
 ---
 
-## 8. Módulo de Comprobantes de Pago y Nómina (`/constancias-admin` y `/constancias`)
+## 8. Módulo de Documentos Dinámicos y Comprobantes (`/constancias-admin` y `/constancias`)
 
 ### 8.1. Estado Actual y Diagnóstico
 - **Rutas del Sistema:** `http://localhost:5173/constancias-admin` (Panel de Administración de Comprobantes) y `http://localhost:5173/constancias` (Portal del Empleado).
-- **Persistencia Actual:** La interfaz está utilizando datos simulados de prueba (`src/mock/comprobanteMock.ts`) que sirven como maqueta interactiva (con filtros de fecha, búsqueda, cálculo de totales emitidos/pendientes y modal de carga).
-- **Indicador Visual:** Se integró un indicador flotante no intrusivo en la esquina inferior derecha (*"Información de Mock (Demostración)"*) para identificar fácilmente que la vista opera en modo mockup mientras se conecta a la API.
+- **Estado:** ✅ **Completado e Integrado con Persistencia Real (`DocumentVerification`)**
+  - Los mocks de `comprobanteMock.ts` y el indicador flotante fueron retirados por completo.
+  - Ambas vistas consumen directamente la entidad canónica `DocumentVerification` vía TanStack Query (`useDocuments` y `useDocumentsByRecipient`).
+  - Los endpoints `/documents` y `/documents/recipient/:id` realizan consultas reales en PostgreSQL con paginación, filtros de tipo, estado, rango de fechas y búsqueda textual en base de datos.
+  - Estandarización de títulos y descargas: `<Tipo de Doc> (<Dia Mes Año>) - <Nombre Destinatario> <Cedula Parseada>`.
+  - La barra de filtros de `/constancias` está organizada en 2 filas limpias, y `/constancias-admin` mantiene su cabecera de fila única.
+  - El botón "Cargar Nómina del Mes" redirige a `/administracion?upload=true`, expandiendo la sección de carga con animación suave e integrando el flujo de carga real de empleados (`POST /empleados/upload`).
 
-### 8.2. Esquema Relacional de Base de Datos a Implementar (`payroll_receipts` / `comprobantes`)
+### 8.2. Esquema Relacional de Base de Datos Implementado (`document_verifications`)
 
-Para sustituir los mocks por datos 100% reales, se requiere crear en NestJS TypeORM / PostgreSQL la tabla de recibos de pago:
-
-```sql
-CREATE TYPE estado_comprobante_enum AS ENUM ('EMITIDO', 'PENDIENTE', 'ANULADO');
-
-CREATE TABLE comprobantes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    employee_id UUID NOT NULL REFERENCES employees(user_id) ON DELETE CASCADE,
-    periodo VARCHAR(50) NOT NULL,            -- Ej: 'Octubre 2024'
-    referencia VARCHAR(50) UNIQUE NOT NULL,  -- Ej: 'NOM-2024-1022'
-    tipo VARCHAR(50) NOT NULL,               -- Ej: 'Sueldo Base', 'Sueldo Base + Bonos'
-    sueldo_base NUMERIC(14, 2) NOT NULL,     -- Sueldo base en Bs
-    bonos NUMERIC(14, 2) DEFAULT 0.00,       -- Complementos / Bonificaciones
-    deducciones NUMERIC(14, 2) DEFAULT 0.00, -- IVSS, LPH, etc.
-    monto_neto NUMERIC(14, 2) NOT NULL,      -- Total a transferir
-    fecha_emision DATE NOT NULL DEFAULT CURRENT_DATE,
-    estado estado_comprobante_enum NOT NULL DEFAULT 'EMITIDO',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_comprobantes_employee ON comprobantes(employee_id);
-CREATE INDEX idx_comprobantes_periodo ON comprobantes(periodo);
-CREATE INDEX idx_comprobantes_estado ON comprobantes(estado);
-```
+La entidad `DocumentVerification` opera como el registro universal e inmutable de certificados y documentos emitidos en el sistema:
+- Clave foránea `recipientUserId` vinculada a `users(id)`.
+- Metadata JSONB que preserva el snapshot inmutable de emisión (cargo, horas, horario, sueldo).
+- Códigos de verificación con sellos criptográficos QR AES-256-GCM.
+- Auditoría de estado (`VALID`, `REVOKED`).
 
 ### 8.3. Endpoints de la API Backend (NestJS)
-1. `GET /api/comprobantes`:
-   - Parámetros: `?search=`, `?periodo=`, `?estado=`, `?page=`, `?limit=`.
-   - Retorna: Lista paginada con estadísticas globales (Total registros, Total emitidos, Total pendientes, Total empleados únicos).
-2. `GET /api/comprobantes/empleado/:employeeId`:
-   - Retorna el histórico de recibos de pago del usuario autenticado.
-3. `POST /api/comprobantes/upload-batch`:
-   - Procesa la subida del Excel/CSV del modal de nómina e inserta masivamente los comprobantes en la BD.
-4. `PATCH /api/comprobantes/:id/anular`:
-   - Cambia el estado a `ANULADO` con motivo administrativo.
-
-### 8.4. Conexión en Frontend
-- Reemplazar el import `MOCK_COMPROBANTES` por `useQuery` que consuma `comprobantesApi.getAll()`.
-- Retirar el indicador flotante de mock una vez completada la integración.
+1. `GET /documents`:
+   - Parámetros: `?search=`, `?page=`, `?limit=`, `?documentType=`, `?status=`, `?from=`, `?to=`.
+   - Consulta TypeORM directa con filtrado en base de datos y paginación estructurada.
+2. `GET /documents/recipient/:userId`:
+   - Historial de documentos del usuario con autorización de auto-acceso y filtros de emisor, tipo, estado y fechas.
+3. `GET /documents/stats`:
+   - Contadores globales de documentos válidos, revocados y total emitido.
+4. `PATCH /documents/:id/revoke`:
+   - Revocación de documento con validación de UUID.

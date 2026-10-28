@@ -48,9 +48,19 @@
 
 ---
 
-## Next Active Milestone: Frontend Dynamic Documents & Tests
+### Phase 4: Dynamic Documents & Query Integration
 
-**Goal:** Wire frontend document views (`AdminConstanciasPage`, `ConstanciasPage`) to real backend endpoints (`/api/documents`), eliminate frontend mock data (`src/mock/`), and bootstrap Vitest test suites.
+- [x] Wire `GET /documents` to real TypeORM database query with pagination, search, status, type, and date filters
+- [x] Wire `GET /documents/recipient/:id` to real TypeORM database query with recipient self-access security and filtering
+- [x] Standardize document titles in pdfmake (`employementLetterByID.report.ts`, `constanciaMensual.report.ts`)
+- [x] Standardize HTTP response `Content-Disposition` header filenames with UTF-8 encoding support
+- [x] Verify all 40 unit and Supertest integration tests in `src/documents` pass (`bun test src/documents`)
+
+---
+
+## Next Active Milestone: Frontend Vitest Test Bootstrap & Period Management
+
+**Goal:** Bootstrap Vitest test suites (`auth.schema.test.ts`, `empleado.schema.test.ts`) and prepare AcademicPeriod domain architecture.
 
 ---
 

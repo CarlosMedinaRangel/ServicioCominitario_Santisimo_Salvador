@@ -101,7 +101,7 @@ export class UserSeeder {
     for (let i = 1; i <= 15; i++) {
       const bulkUser = this.userRepository.create({
         email: `employee${i}@santisimo.edu`,
-        password: await bcrypt.hash(`Employee${i}123!`, 10),
+        password: await bcrypt.hash('EmployeePass123!', 10),
         fullName: `Employee ${i}`,
         cedula: `V${1000000 + i}`,
         telefono: `0414${String(5500000 + i).padStart(7, '0')}`,

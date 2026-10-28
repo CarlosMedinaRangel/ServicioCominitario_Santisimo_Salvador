@@ -142,9 +142,11 @@ export class AuthService {
     const passwordValid = await bcrypt.compare(password, user.password);
     if (!passwordValid) {
       user.lastFailedAttemptAt = new Date();
-      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+      const attempts = (Number(user.failedLoginAttempts) || 0) + 1;
+      user.failedLoginAttempts = attempts;
+      const remaining = Math.max(0, 5 - attempts);
 
-      if (user.failedLoginAttempts >= 5) {
+      if (attempts >= 5) {
         user.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes lockout
         await this.userRepository.save(user);
         throw new HttpException(
@@ -159,7 +161,6 @@ export class AuthService {
       }
 
       await this.userRepository.save(user);
-      const remaining = 5 - user.failedLoginAttempts;
       throw new UnauthorizedException(
         `Credenciales inválidas. Le quedan ${remaining} intento(s) antes del bloqueo temporal de la cuenta.`,
       );

@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -21,8 +22,10 @@ import {
 import { DocumentsService } from './documents.service';
 import { VerifyDocumentDto } from './dto/verify-document.dto';
 import { Auth } from '../auth/Decorators/auth.decorator';
+import { GetUser } from '../auth/Decorators/get-user.decorator';
 import { ValidRoles } from '../auth/interfaces';
-import { DocumentVerification, DocumentStatus } from './entities/document-verification.entity';
+import { User } from '../auth/entities/auth.entity';
+import { DocumentVerification, DocumentStatus, DocumentType } from './entities/document-verification.entity';
 
 @ApiTags('Documents')
 @Controller('documents')
@@ -74,16 +77,29 @@ export class DocumentsController {
   @Get()
   @Auth(ValidRoles.admin)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Listar todos los comprobantes emitidos con paginación (Solo Administrador)' })
+  @ApiOperation({ summary: 'Listar todos los comprobantes emitidos con paginación y filtros (Solo Administrador)' })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 20 })
   @ApiQuery({ name: 'status', enum: DocumentStatus, required: false })
+  @ApiQuery({ name: 'documentType', enum: DocumentType, required: false })
+  @ApiQuery({ name: 'search', required: false, example: 'Carlos' })
+  @ApiQuery({ name: 'from', required: false, example: '2026-01-01' })
+  @ApiQuery({ name: 'to', required: false, example: '2026-12-31' })
   findAll(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('status') status?: DocumentStatus,
+    @Query('documentType') documentType?: DocumentType,
+    @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
-    return this.documentsService.findAll({ page, limit, status });
+    const opts: any = { page, limit, status };
+    if (documentType) opts.documentType = documentType;
+    if (search) opts.search = search;
+    if (from) opts.from = from;
+    if (to) opts.to = to;
+    return this.documentsService.findAll(opts);
   }
 
   @Patch(':id/revoke')
@@ -103,18 +119,63 @@ export class DocumentsController {
   }
 
   @Get('recipient/:id')
-  @Auth(ValidRoles.admin)
+  @Auth()
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Listar documentos emitidos a un destinatario (Solo Administrador)',
-    description: 'Devuelve todo el historial de constancias emitidas a un empleado o alumno.',
+    summary: 'Listar documentos emitidos a un destinatario',
+    description:
+      'Devuelve el historial de constancias emitidas a un empleado o alumno. Un usuario regular solo puede consultar sus propios documentos; los administradores pueden consultar los de cualquier destinatario.',
   })
   @ApiResponse({
     status: 200,
     description: 'Lista de comprobantes del destinatario.',
     type: [DocumentVerification],
   })
-  findByRecipient(@Param('id') recipientId: string) {
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Número de página (1-based)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Cantidad de registros por página' })
+  @ApiQuery({ name: 'status', required: false, enum: DocumentStatus, description: 'Filtrar por estado del documento' })
+  @ApiQuery({ name: 'documentType', required: false, enum: DocumentType, description: 'Filtrar por tipo de documento' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Filtrar por emisor / emitido por' })
+  @ApiQuery({ name: 'from', required: false, type: String, description: 'Fecha inicio rango (ISO)' })
+  @ApiQuery({ name: 'to', required: false, type: String, description: 'Fecha fin rango (ISO)' })
+  findByRecipient(
+    @Param('id') recipientId: string,
+    @GetUser() user: User,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: DocumentStatus,
+    @Query('documentType') documentType?: DocumentType,
+    @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const isAdmin = user.roles?.includes(ValidRoles.admin);
+    if (!isAdmin && user.id !== recipientId) {
+      throw new ForbiddenException(
+        'No tienes permisos para consultar documentos de otro destinatario.',
+      );
+    }
+    const hasOptions =
+      page !== undefined ||
+      limit !== undefined ||
+      status !== undefined ||
+      documentType !== undefined ||
+      search !== undefined ||
+      from !== undefined ||
+      to !== undefined;
+
+    if (hasOptions) {
+      return this.documentsService.findByRecipient(recipientId, {
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        status,
+        documentType,
+        search,
+        from,
+        to,
+      });
+    }
+
     return this.documentsService.findByRecipient(recipientId);
   }
 }

@@ -20,7 +20,7 @@ import { EntityData } from '../../common/types/entity-data.type';
  */
 
 export const CANONICAL_ADMIN_USER = {
-  id: 'a0000000-0000-0000-0000-000000000001',
+  id: 'a0000000-0000-4000-8000-000000000001',
   email: 'admin@santisimo.edu',
   password: '$2b$10$mockHashedPasswordAdmin1234567890abcdef',
   fullName: 'Administrador del Sistema',
@@ -37,7 +37,7 @@ export const CANONICAL_ADMIN_USER = {
 } satisfies EntityData<User>;
 
 export const CANONICAL_ELENA_USER = {
-  id: 'a0000000-0000-0000-0000-000000000002',
+  id: 'a0000000-0000-4000-8000-000000000002',
   email: 'elena.rodriguez@academia.edu',
   password: '$2b$10$mockHashedPasswordElena1234567890abcdef',
   fullName: 'Dr. Elena Rodríguez',
@@ -54,7 +54,7 @@ export const CANONICAL_ELENA_USER = {
 } satisfies EntityData<User>;
 
 export const CANONICAL_CARLOS_USER = {
-  id: 'a0000000-0000-0000-0000-000000000003',
+  id: 'a0000000-0000-4000-8000-000000000003',
   email: 'carlos.perez@academia.edu',
   password: '$2b$10$mockHashedPasswordCarlos123456789abcdef',
   fullName: 'Ing. Carlos Pérez',
@@ -71,7 +71,7 @@ export const CANONICAL_CARLOS_USER = {
 } satisfies EntityData<User>;
 
 export const CANONICAL_ANA_USER = {
-  id: 'a0000000-0000-0000-0000-000000000004',
+  id: 'a0000000-0000-4000-8000-000000000004',
   email: 'ana.torres@academia.edu',
   password: '$2b$10$mockHashedPasswordAna1234567890abcdef',
   fullName: 'Lic. Ana Torres',
@@ -88,7 +88,7 @@ export const CANONICAL_ANA_USER = {
 } satisfies EntityData<User>;
 
 export const CANONICAL_INACTIVE_USER = {
-  id: 'a0000000-0000-0000-0000-000000000005',
+  id: 'a0000000-0000-4000-8000-000000000005',
   email: 'docente.inactivo@santisimo.edu',
   password: '$2b$10$mockHashedPasswordInactive123456789abc',
   fullName: 'Prof. Inactivo Retirado',

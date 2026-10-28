@@ -22,7 +22,6 @@ describe('EmpleadosController', () => {
       findSchedules: jest.fn(),
       findGroups: jest.fn(),
       findActivities: jest.fn(),
-      seedActivities: jest.fn(),
       update: jest.fn(),
       toggleStatus: jest.fn(),
       remove: jest.fn(),
@@ -193,10 +192,5 @@ describe('EmpleadosController', () => {
       expect(mockEmpleadosService.findActivities).toHaveBeenCalledWith('emp-1');
     });
 
-    it('should call seedActivities with month parameter or default to current month', async () => {
-      (mockEmpleadosService.seedActivities as jest.Mock).mockResolvedValue([]);
-      await controller.seedActivities('emp-1', '2026-08');
-      expect(mockEmpleadosService.seedActivities).toHaveBeenCalledWith('emp-1', '2026-08');
-    });
   });
 });
