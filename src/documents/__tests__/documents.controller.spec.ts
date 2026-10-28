@@ -1,8 +1,10 @@
+import { ForbiddenException } from '@nestjs/common';
 import { DocumentsController } from '../documents.controller';
 import { DocumentsService } from '../documents.service';
 import { VerifyDocumentDto } from '../dto/verify-document.dto';
 import { DocumentStatus } from '../entities/document-verification.entity';
 import { createMockDocumentVerification } from '../../../test/fixtures/document.fixture';
+import { createMockUser } from '../../../test/fixtures/user.fixture';
 import { createValidDto } from '../../../test/fixtures/dto-factory.helper';
 
 describe('DocumentsController', () => {
@@ -106,17 +108,37 @@ describe('DocumentsController', () => {
   });
 
   describe('findByRecipient', () => {
-    it('should forward recipientId to documentsService.findByRecipient', async () => {
+    it('should forward recipientId to documentsService.findByRecipient when admin requests', async () => {
+      const adminUser = createMockUser({ id: 'admin-1', roles: ['admin'] });
       const mockHistory = [
         createMockDocumentVerification({ id: 'doc-1' }),
         createMockDocumentVerification({ id: 'doc-2' }),
       ];
       (mockDocumentsService.findByRecipient as jest.Mock).mockResolvedValue(mockHistory);
 
-      const result = await controller.findByRecipient('recipient-uuid-123');
+      const result = await controller.findByRecipient('recipient-uuid-123', adminUser);
 
       expect(mockDocumentsService.findByRecipient).toHaveBeenCalledWith('recipient-uuid-123');
       expect(result).toBe(mockHistory);
+    });
+
+    it('should forward recipientId when non-admin requests their own documents', async () => {
+      const normalUser = createMockUser({ id: 'recipient-uuid-123', roles: ['user'] });
+      const mockHistory = [createMockDocumentVerification({ id: 'doc-1' })];
+      (mockDocumentsService.findByRecipient as jest.Mock).mockResolvedValue(mockHistory);
+
+      const result = await controller.findByRecipient('recipient-uuid-123', normalUser);
+
+      expect(mockDocumentsService.findByRecipient).toHaveBeenCalledWith('recipient-uuid-123');
+      expect(result).toBe(mockHistory);
+    });
+
+    it('should throw ForbiddenException when non-admin requests someone else documents', async () => {
+      const normalUser = createMockUser({ id: 'other-user-id', roles: ['user'] });
+
+      expect(() =>
+        controller.findByRecipient('recipient-uuid-123', normalUser),
+      ).toThrow(ForbiddenException);
     });
   });
 });

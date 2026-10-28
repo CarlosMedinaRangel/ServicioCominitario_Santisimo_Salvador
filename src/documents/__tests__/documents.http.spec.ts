@@ -38,7 +38,7 @@ describe('DocumentsController (Exhaustive HTTP Integration with Supertest)', () 
   });
 
   const mockDoc = createMockDocumentVerification({
-    id: 'a0000000-0000-0000-0000-000000000001',
+    id: 'a0000000-0000-4000-8000-000000000001',
     verificationCode: 'SS-DOC:v1:ivMock123456.authTagMock1234.cipherMock1234567890',
   });
 
@@ -279,14 +279,26 @@ describe('DocumentsController (Exhaustive HTTP Integration with Supertest)', () 
   // 5. GET /documents/recipient/:id - Recipient History
   // ════════════════════════════════════════════════════════════════════════════════
   describe('GET /documents/recipient/:id', () => {
-    it('should return 403 Forbidden for non-admin user', async () => {
+    it('should return 403 Forbidden for non-admin user attempting to view another recipient documents', async () => {
       await request(app.getHttpServer())
         .get('/documents/recipient/target-recipient-id')
         .set('Authorization', 'Bearer user-token')
         .expect(403);
     });
 
-    it('should return 200 OK and documents list for admin', async () => {
+    it('should return 200 OK and documents list for non-admin user requesting their own documents', async () => {
+      (mockDocumentsService.findByRecipient as jest.Mock).mockResolvedValue([mockDoc]);
+
+      const res = await request(app.getHttpServer())
+        .get(`/documents/recipient/${mockNormalUser.id}`)
+        .set('Authorization', 'Bearer user-token')
+        .expect(200);
+
+      expect(res.body).toHaveLength(1);
+      expect(mockDocumentsService.findByRecipient).toHaveBeenCalledWith(mockNormalUser.id);
+    });
+
+    it('should return 200 OK and documents list for admin requesting any recipient documents', async () => {
       (mockDocumentsService.findByRecipient as jest.Mock).mockResolvedValue([mockDoc]);
 
       const res = await request(app.getHttpServer())
