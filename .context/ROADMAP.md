@@ -26,8 +26,8 @@
 | D-03 | JWT returned in JSON body + cookie | `resolved` | Token stripped from response body across login and /auth/me (cookie only). Strict allowlist projection (toSafeUser) & universal { select: false } sensitive columns |
 | D-04 | Test/private routes in controller | `resolved` | Removed /private* test routes from auth.controller |
 | D-05 | Prototype seedActivities generator in production service | `prototype-ok` | Remove `seedActivities` method & `POST /:id/seed-activities` endpoint. Note: The activities table in `constanciaMensual.report.ts` was commented out with `AI_PRESERVE_FEATURE`, making this generator orphaned and safe to deprecate/remove |
-| D-07 | God service (`empleados.service.ts`, now 851 lines) | `pre-student-blocker` | Decompose into 4 focused domain services: `EmpleadosCrudService`, `ConstanciaService`, `ExcelUploadService`, and `EmployeeActivityService` to comply with the 200-line service target |
-| D-09 | Orchestration + PDF generation entangled in employee CRUD | `pre-student-blocker` | Extract `ConstanciaService` to isolate pdfmake document definitions, cryptographic QR seal issuance, and employer signatory metadata out of `empleados.service.ts` |
+| D-07 | God service (`empleados.service.ts`, originally 788 lines) | `resolved` | Decomposed into `services/empleados.service.ts` (CRUD), `services/constancia.service.ts`, `services/excel-upload.service.ts`, and `utils/excel-parser.util.ts` without barrel wrappers |
+| D-09 | Orchestration + PDF generation entangled in employee CRUD | `resolved` | Extracted `ConstanciaService` to isolate pdfmake document definitions, cryptographic QR seal issuance, and employer signatory metadata out of `empleados.service.ts` |
 | D-10 | `exports: [EmpleadosModule]` self-export | `resolved` | Cleaned exports array in EmpleadosModule |
 | D-11 | No unit tests (0 spec files) | `resolved` | 27 test suites, 180 unit & Supertest integration tests (100% passing) |
 | D-12 | No migrations despite config | `prototype-ok` | Deferred until schema final |
@@ -62,7 +62,7 @@
 ### Backend
 | File | Lines | Decomposition Plan |
 |------|-------|-------------------|
-| `empleados.service.ts` | 851 | Split into `EmpleadosCrudService`, `ConstanciaService`, `ExcelUploadService`, `EmployeeActivityService` |
+| `empleados.service.ts` | 788 | `resolved`: Split into `services/empleados.service.ts`, `services/constancia.service.ts`, `services/excel-upload.service.ts`, `utils/excel-parser.util.ts` |
 
 ### Frontend Hooks
 | File | Lines | Decomposition Plan |
@@ -117,11 +117,11 @@
 
 ### Phase 2: Architecture Cleanup & Historical Foundations (Next Milestone)
 
-- [ ] Fix D-07: Decompose `empleados.service.ts` (851 lines -> 4 focused services: CRUD, Constancias, ExcelUpload, Activities)
+- [x] Fix D-07: Decompose `empleados.service.ts` (788 lines -> `services/empleados.service.ts`, `services/constancia.service.ts`, `services/excel-upload.service.ts`, `utils/excel-parser.util.ts`)
 - [x] Fix D-27: Change bcrypt.hashSync to async (Fully verified across auth, empleados, and seeders)
 - [ ] Fix D-28: Add atomic transaction (`dataSource.transaction` / `QueryRunner`) and bulk optimization to Excel `uploadFile`
 - [ ] Fix D-29: Create custom repository classes extending `Repository<T>` for domain queries (aligned with D-07 decomposition)
-- [ ] Fix D-09: Extract `ConstanciaService` (isolate pdfmake reports and cryptographic QR seal issuance from employee CRUD)
+- [x] Fix D-09: Extract `ConstanciaService` (isolate pdfmake reports and cryptographic QR seal issuance from employee CRUD)
 - [ ] Implement `AcademicPeriod` entity (Year/Lapso) to historically bind `schedules` and `groups` (Advanced from Phase 6 to establish clean relational foundations before real XLS data arrival)
 
 ### Phase 3: Real Data Integration

@@ -1,5 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { EmpleadosService } from './empleados.service';
+import { EmpleadosService } from './services/empleados.service';
+import { ConstanciaService } from './services/constancia.service';
+import { ExcelUploadService } from './services/excel-upload.service';
 import { EmpleadosController } from './empleados.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Employee } from './entities/employee.entity';
@@ -14,7 +16,7 @@ import { ActivityService } from './activity-service/activity-service.service';
 
 @Module({
   controllers: [EmpleadosController],
-  providers: [EmpleadosService, ActivityService],
+  providers: [EmpleadosService, ConstanciaService, ExcelUploadService, ActivityService],
   imports: [
     TypeOrmModule.forFeature([Employee, Schedule, Group, Activity, User]),
     CloudinaryModule,
@@ -24,6 +26,8 @@ import { ActivityService } from './activity-service/activity-service.service';
   exports: [
     TypeOrmModule,
     EmpleadosService,
+    ConstanciaService,
+    ExcelUploadService,
     CloudinaryModule,
     ActivityService,
   ],

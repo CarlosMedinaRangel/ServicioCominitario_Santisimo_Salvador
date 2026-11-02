@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import { EmpleadosService } from '../empleados.service';
+import { EmpleadosService } from '../services/empleados.service';
 import { Employee } from '../entities/employee.entity';
 import { User } from '../../auth/entities/auth.entity';
 import { CreateEmpleadoDto } from '../dto/create-empleado.dto';

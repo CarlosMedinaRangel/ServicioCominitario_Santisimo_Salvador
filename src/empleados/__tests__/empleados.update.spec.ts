@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import { EmpleadosService } from '../empleados.service';
+import { EmpleadosService } from '../services/empleados.service';
 import { Employee } from '../entities/employee.entity';
 import { Group } from '../entities/group.entity';
 import { Schedule } from '../entities/schedule.entity';

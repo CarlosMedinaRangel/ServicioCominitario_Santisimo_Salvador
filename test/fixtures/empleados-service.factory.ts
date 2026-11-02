@@ -1,7 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { EmpleadosService } from '../../src/empleados/empleados.service';
+import { EmpleadosService } from '../../src/empleados/services/empleados.service';
+import { ConstanciaService } from '../../src/empleados/services/constancia.service';
+import { ExcelUploadService } from '../../src/empleados/services/excel-upload.service';
 import { Employee } from '../../src/empleados/entities/employee.entity';
 import { Schedule } from '../../src/empleados/entities/schedule.entity';
 import { Group } from '../../src/empleados/entities/group.entity';
@@ -27,23 +29,30 @@ export interface EmpleadosMocks {
 }
 
 /**
- * Creates a standard NestJS testing module for EmpleadosService.
+ * Creates a standard NestJS testing module for EmpleadosService and its specialized domain services.
  *
  * Eliminates the anti-pattern of manual instantiation with `{} as unknown as Repository<X>`.
  * Each dependency is registered through Nest's Dependency Injection system using `useValue`,
  * providing full type-safety, minimal test boilerplate, and zero type lies.
  *
  * @param overrides Optional partial mock implementations for specific test requirements.
- * @returns An initialized `EmpleadosService` and the collection of injected typed mocks.
+ * @returns Initialized services and the collection of injected typed mocks.
  */
 export async function createEmpleadosServiceTestModule(
   overrides: Partial<EmpleadosMocks> = {},
-): Promise<{ service: EmpleadosService; mocks: EmpleadosMocks }> {
+): Promise<{
+  service: EmpleadosService;
+  constanciaService: ConstanciaService;
+  excelUploadService: ExcelUploadService;
+  mocks: EmpleadosMocks;
+}> {
   const mocks: EmpleadosMocks = {
     employeeRepo: overrides.employeeRepo ?? {
       find: jest.fn(),
       findOne: jest.fn(),
       findOneBy: jest.fn(),
+      count: jest.fn(),
+      findAndCount: jest.fn(),
       create: jest.fn((dto) => dto),
       save: jest.fn((entity) => Promise.resolve(entity)),
       update: jest.fn(),
@@ -76,15 +85,19 @@ export async function createEmpleadosServiceTestModule(
       findOne: jest.fn(),
       findOneBy: jest.fn(),
       save: jest.fn((entity) => Promise.resolve(entity)),
+      create: jest.fn((dto) => dto),
     },
     printerService: overrides.printerService ?? {
       createPdf: jest.fn(),
     },
     documentsService: overrides.documentsService ?? {
-      generateSeal: jest.fn(),
+      issueDocument: jest.fn(),
+      findOne: jest.fn(),
+      getQrDataUrl: jest.fn(),
     },
     cryptoService: overrides.cryptoService ?? {
-      encryptDigitalIdToken: jest.fn(),
+      encryptPayload: jest.fn().mockReturnValue('SS-EDID:v1:mock'),
+      decryptPayload: jest.fn(),
     },
     dataSource: overrides.dataSource ?? {
       transaction: jest.fn((cb: (em: unknown) => unknown) => cb({})),
@@ -98,6 +111,8 @@ export async function createEmpleadosServiceTestModule(
   const moduleRef = await Test.createTestingModule({
     providers: [
       EmpleadosService,
+      ConstanciaService,
+      ExcelUploadService,
       { provide: getRepositoryToken(Employee), useValue: mocks.employeeRepo },
       { provide: getRepositoryToken(Schedule), useValue: mocks.scheduleRepo },
       { provide: getRepositoryToken(Group), useValue: mocks.groupRepo },
@@ -112,5 +127,7 @@ export async function createEmpleadosServiceTestModule(
   }).compile();
 
   const service = moduleRef.get<EmpleadosService>(EmpleadosService);
-  return { service, mocks };
+  const constanciaService = moduleRef.get<ConstanciaService>(ConstanciaService);
+  const excelUploadService = moduleRef.get<ExcelUploadService>(ExcelUploadService);
+  return { service, constanciaService, excelUploadService, mocks };
 }
