@@ -7,18 +7,18 @@
 
 A continuación se establece el orden estricto de trabajo acordado para cerrar los módulos operativos y pasar a fases posteriores:
 
-1. **FASE INMEDIATA: Modelo Universal de Documentos, Relación con Personas y Revocación Criptográfica (Punto B)**
+1. **FASE INMEDIATA: Modelo Universal de Documentos, Relación con Personas y Revocación Criptográfica (Punto B) (✅ Estado: Completado en Backend y Verificación)**
    - **Objetivo:** Consolidar `DocumentVerification` como la entidad maestra canónica de emisión y auditoría para todos los certificados institucionales.
    - **Backend:**
-     - Clave foránea formal `recipientUserId` vinculada a `User` (`@ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })`).
-     - Campos de auditoría de revocación: `revokedAt`, `revokedByUserId` (`@ManyToOne(() => User)`), `revocationReason` (obligatorio).
-     - Endpoint `PATCH /api/documents/:id/revoke` protegido con `@UseGuards(JwtAuthGuard, RolesGuard)` y `@Roles('ADMIN')`.
-     - Endpoint `GET /api/documents/recipient/:userId` para listar el historial de documentos de un empleado/usuario.
+     - [x] Clave foránea formal `recipientUserId` vinculada a `User` (`@ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })`).
+     - [x] Campos de auditoría de revocación: `revokedAt`, `revokedByUserId` (`@ManyToOne(() => User)`), `revocationReason` (obligatorio).
+     - [x] Endpoint `PATCH /api/documents/:id/revoke` protegido con `@UseGuards(JwtAuthGuard, RolesGuard)` y `@Roles('ADMIN')`.
+     - [x] Endpoint `GET /api/documents/recipient/:userId` para listar el historial de documentos de un empleado/usuario.
    - **Frontend:**
-     - Envolver la ruta `/verificar` con `<RoleGuard allowedRoles={["admin"]}>` (**Verificación PRIVADA exclusiva de Administradores**).
-     - Componente `AdminRevokeDocumentModal.tsx` en `/constancias-admin` con selector de motivo y confirmación.
-     - Indicador visual de documento revocado con motivo oficial y fecha.
-   - **Cápsula del Tiempo (`metadata` JSONB):** Mantener el snapshot inmutable de datos en base de datos para verificación y regeneración idéntica de PDFs sin almacenar archivos binarios pesados.
+     - [x] Envolver la ruta `/verificar` con `<RoleGuard allowedRoles={["admin"]}>` (**Verificación PRIVADA exclusiva de Administradores**).
+     - [ ] Componente `AdminRevokeDocumentModal.tsx` en `/constancias-admin` con selector de motivo y confirmación.
+     - [x] Indicador visual de documento revocado con motivo oficial y fecha en `/verificar`.
+   - [x] **Cápsula del Tiempo (`metadata` JSONB):** Mantener el snapshot inmutable de datos en base de datos para verificación y regeneración idéntica de PDFs sin almacenar archivos binarios pesados.
 
 2. **FASE FUTURA: Nuevos Tipos de Documentos y Esquemas de Metadatos (A integrar progresivamente)**
    - **`CONSTANCIA_TRABAJO` (Activo):** `cargo`, `horasPorDia`, `horario`, `fechaIngreso`, `institucion`, `periodo`.
