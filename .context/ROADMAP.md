@@ -1,6 +1,6 @@
 # ROADMAP.md — Project Backlog & Technical Debt
 
-> Last updated: 2026-10-25
+> Last updated: 2026-11-01
 > Scope: Both projects (Backend + Frontend)
 
 ---
@@ -53,7 +53,7 @@
 | D-25 | Very new majors (React 19, Vite 8) | `monitor` | Watch for breakage |
 | D-31 | Missing backward navigation / return button in Edit Employee flow | `resolved` | Added return controls and back arrows in edit/register views |
 | D-32 | Comprehensive responsive design deficit: UI adapted solely for mobile, missing desktop & tablet adaptations across all pages | `fix-now` | Global platform views (`pages/`) |
-| D-33 | Paginated API Response Zod Schemas | `fix-now` | Adapt frontend Zod schemas in `src/schemas/` to handle structured paginated wrapper (`{ data: T[], total, page, totalPages }`) for `/empleados` and `/documents` |
+| D-33 | Paginated API Response Zod Schemas | `resolved` | Adapt frontend Zod schemas in `src/schemas/` to handle structured paginated wrapper (`{ data: T[], total, page, totalPages }`) for `/empleados` and `/documents` |
 
 ---
 
@@ -95,7 +95,7 @@
 
 ## Feature Backlog
 
-### Phase 1: Core Stabilization (Current)
+### Phase 1: Core Stabilization (Completed)
 
 - [x] Fix D-03: Remove JWT from response body & enforce allowlist projection (`toSafeUser`)
 - [x] Fix D-04: Remove test routes from controller
@@ -105,7 +105,6 @@
 - [x] Fix D-08: Consolidate axios instances (Resolved in src/api/client.ts)
 - [x] Fix D-22: Move RegisterAction to correct layer (Resolved in src/api/auth.api.ts)
 - [x] Fix D-31: Add backward options/arrows in Edit Employee and Profile flows (Resolved in frontend)
-- [ ] Fix D-32: Adapt platform UI for desktop/tablet screens (currently mobile-only focused)
 - [x] Fix D-33: Adapt frontend Zod schemas (`src/schemas/`) to handle structured paginated wrapper (`{ data: T[], total, page, totalPages }`) for `/empleados` and `/documents`
 - [x] Dynamic Documents & Queries: Endpoints `/documents` and `/documents/recipient/:id` wired to real PostgreSQL server-side queries with pagination, text search (`recipientName`/`recipientIdentifier` and `issuedByName`), filters (`status`, `documentType`), and date ranges (`from`/`to`)
 - [x] Dynamic Document Naming & Metadata: Standardized document title and download file naming convention `<Tipo de Doc> (<Dia Mes Año>) - <Nombre Destinatario> <Cedula Parseada>` across pdfmake reports, backend Content-Disposition headers, and client programmatic downloads
@@ -113,8 +112,10 @@
 - [x] Standalone Seeder CLI: Deterministic canonical data (`satisfies EntityData<T>`), CLI script `bun run seed`, schema drift tripwires, and null-safe unique column constraints
 - [x] Auth Endpoint Refactoring: Standardized `/auth/check-status` to `/auth/me` without sliding cookie renewal, synced with frontend `auth.api.ts`
 - [x] Universal Sensitive Column Rule: Enforced `{ select: false }` and omitted `@ApiProperty` on internal security/audit fields across entities
+- [x] Bootstrap frontend test infrastructure (Full 7-Phase Vitest test suite completed: 123 tests across 16 files covering schemas, formatters with Gregorian/leap-year handling, Zustand stores, query hooks, QR decoders, and RoleGuard)
+- [ ] Fix D-32: Adapt platform UI for desktop/tablet screens (currently mobile-only focused)
 
-### Phase 2: Architecture Cleanup & Historical Foundations
+### Phase 2: Architecture Cleanup & Historical Foundations (Next Milestone)
 
 - [ ] Fix D-07: Decompose `empleados.service.ts` (851 lines -> 4 focused services: CRUD, Constancias, ExcelUpload, Activities)
 - [x] Fix D-27: Change bcrypt.hashSync to async (Fully verified across auth, empleados, and seeders)

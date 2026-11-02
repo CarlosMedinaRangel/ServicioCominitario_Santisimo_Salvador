@@ -55,8 +55,8 @@ Employee management is the core domain feature. It handles employee CRUD, profil
 | GET | `/api/empleados/:id/schedules` | Admin | Get schedules |
 | GET | `/api/empleados/:id/groups` | Admin | Get groups |
 | GET | `/api/empleados/:id/activities` | Admin | Get activities |
-| POST | `/api/empleados/:id/activities/seed` | Admin | Seed demo activities |
-| GET | `/api/empleados/Constancia-Empleado/:id` | Admin | Generate constancia PDF |
+| POST | `/api/empleados/upload` | Admin | Bulk XLSX/CSV nómina upload |
+| GET | `/api/empleados/:id/constancia` | Admin | Generate constancia PDF |
 
 ---
 
@@ -78,6 +78,7 @@ Employee management is the core domain feature. It handles employee CRUD, profil
 - `components/features/AdminGenerateConstanciaModal.tsx`
 - `components/features/AdminUploadFileModal.tsx`
 - `components/features/AdminColumnMappingModal.tsx`
+- `components/features/AdminUploadBanner.tsx`
 
 ---
 
@@ -100,34 +101,21 @@ Input: "V12345678" → Output: "V12345678"
 
 ---
 
-## Bulk Import (XLSX)
+## Data Flow: Bulk Import
 
-### Current Flow
-1. Admin uploads XLSX file
-2. Column mapping modal appears
-3. Admin maps XLS columns to system fields
-4. Backend processes rows:
-   - Find or create User by email/cedula
-   - Find or create Employee by userId
-   - Returns `{ success, created, updated, errors[] }`
-
-### Fields to Map
-| Field | Required | Notes |
-|-------|----------|-------|
-| email | Yes* | *or cedula |
-| cedula | Yes* | *or email, normalized |
-| fullName | Yes | Employee name |
-| position | No | Default: "General" |
-| start_date | No | Default: today |
-| work_time | No | Default: "08:00:00" |
-| hours_per_day | No | Default: 8 |
-| work_schedule | No | Default: "Lunes a Viernes, 8am - 4pm" |
-| telefono | No | Normalized to digits |
-
-### Known Issues (D-28)
-- N+1 queries (no batching)
-- No transaction (partial failure risk)
-- Sync bcrypt in loop (blocking)
+```
+1. User uploads XLSX/CSV in Frontend (/administracion?upload=true)
+2. Frontend parses headers, displays column mapping modal
+3. User maps columns (cedula, nombre, cargo, etc.)
+4. Frontend sends file + mapping JSON to POST /api/empleados/upload
+5. Backend parses file with XLSX / PapaParse
+6. For each row:
+   a. Look up existing User by email or cedula
+   b. If found → update user + employee fields
+   c. If not found → create User (default password) + Employee
+   d. If schedule info present → create/update Schedule records
+7. Return summary: { success, created, updated, errors: [] }
+```
 
 ---
 
@@ -177,21 +165,23 @@ export class CreateEmpleadoDto {
 
 ## Debt Items Related to This Feature
 
-| ID | Description | Tag |
-|----|-------------|-----|
-| D-07 | God service (empleados.service.ts) | pre-student-blocker |
-| D-26 | `as any` casts in start_date | fix-now |
-| D-28 | Excel upload N+1, no transaction | pre-student-blocker |
-| D-29 | No repository abstraction | pre-student-blocker |
+| ID | Description | Tag | Notes |
+|----|-------------|-----|-------|
+| D-07 | God service (empleados.service.ts) | `pre-student-blocker` | Target: Decompose into 3 domain services in `src/empleados/services/` |
+| D-26 | `as any` casts in start_date | `resolved` | Removed redundant casts in `seed.service.ts` |
+| D-28 | Excel upload N+1, no transaction | `pre-student-blocker` | Integrate `dataSource.transaction` in `ExcelUploadService` |
+| D-29 | No repository abstraction | `pre-student-blocker` | Move to custom repository classes during Phase 2 |
 
 ---
 
 ## Testing Checklist
 
-- [ ] Unit test: Cedula normalization
-- [ ] Unit test: Smart ID lookup (UUID vs cedula)
-- [ ] Unit test: Soft delete behavior
-- [ ] Integration test: CRUD endpoints
-- [ ] Integration test: Bulk import with valid data
-- [ ] Integration test: Bulk import with invalid rows
-- [ ] E2E test: Create employee → view profile → generate constancia
+- [x] Unit test: Cedula normalization and smart search (`empleados.pagination.spec.ts`)
+- [x] Unit test: Smart ID lookup UUID vs cedula (`empleados.pagination.spec.ts`)
+- [x] Unit test: Soft delete behavior and toggle status (`empleados.soft-delete.spec.ts`)
+- [x] Unit test: Employee manual creation with relations (`empleados.create.spec.ts`)
+- [x] Unit test: Employee schedule and group updates (`empleados.update.spec.ts`)
+- [x] Unit test: Bulk import with valid data and invalid rows (`empleados.excel.spec.ts`)
+- [x] Integration test: CRUD endpoints and query filters (`empleados.http.spec.ts`)
+- [x] Integration test: Bulk upload multipart endpoint (`empleados.http.spec.ts`)
+- [x] E2E test: Create employee → view profile → generate constancia (`empleados.http.spec.ts`, `empleados.reports.spec.ts`)
