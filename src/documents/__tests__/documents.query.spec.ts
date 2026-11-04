@@ -103,6 +103,12 @@ describe('DocumentsService - Queries, Revocation & Pagination', () => {
         total: 45,
         page: 1,
         totalPages: 3,
+        stats: {
+          total: 45,
+          validos: 0,
+          revocados: 45,
+          uniqueRecipients: 0,
+        },
       });
     });
 
@@ -128,26 +134,14 @@ describe('DocumentsService - Queries, Revocation & Pagination', () => {
         total: 15,
         page: 2,
         totalPages: 2,
+        stats: {
+          total: 15,
+          validos: 0,
+          revocados: 15,
+          uniqueRecipients: 0,
+        },
       });
     });
   });
 
-  describe('getStats', () => {
-    it('should return total, valid, and revoked document counts', async () => {
-      (mockDocRepo.count as jest.Mock).mockImplementation((opts?: any) => {
-        if (!opts) return Promise.resolve(100);
-        if (opts.where?.status === DocumentStatus.VALID) return Promise.resolve(85);
-        if (opts.where?.status === DocumentStatus.REVOKED) return Promise.resolve(15);
-        return Promise.resolve(0);
-      });
-
-      const stats = await service.getStats();
-
-      expect(stats).toEqual({
-        total: 100,
-        valid: 85,
-        revoked: 15,
-      });
-    });
-  });
 });

@@ -54,7 +54,7 @@ export class DocumentsService {
     private readonly userRepo: Repository<User>,
     private readonly cryptoService: CryptoService,
     private readonly qrGeneratorService: QrGeneratorService,
-  ) {}
+  ) { }
 
   /**
    * Registers a new issued document in DB, encrypts its cryptographic seal and creates the QR image.
@@ -290,32 +290,46 @@ export class DocumentsService {
       from?: string;
       to?: string;
     },
-  ): Promise<{ data: DocumentVerification[]; total: number; page: number; totalPages: number } | DocumentVerification[]> {
-    const isPaginated =
-      options?.page !== undefined ||
-      options?.limit !== undefined ||
-      options?.search !== undefined ||
-      options?.documentType !== undefined ||
-      options?.from !== undefined ||
-      options?.to !== undefined ||
-      options?.status !== undefined;
-
-    if (!isPaginated) {
-      return this.docVerificationRepo.find({
-        where: { recipientId },
-        order: { issuedAt: 'DESC' },
-      });
+  ): Promise <
+    | {
+      data: DocumentVerification[];
+      total: number;
+      page: number;
+      totalPages: number;
+      stats?: {
+        total: number;
+        validos: number;
+        revocados: number;
+        uniqueRecipients: number;
+      };
     }
+      | DocumentVerification[]
+      > {
+        const isPaginated =
+          options?.page !== undefined ||
+          options?.limit !== undefined ||
+          options?.search !== undefined ||
+          options?.documentType !== undefined ||
+          options?.from !== undefined ||
+          options?.to !== undefined ||
+          options?.status !== undefined;
+
+        if(!isPaginated) {
+          return this.docVerificationRepo.find({
+            where: { recipientId },
+            order: { issuedAt: 'DESC' },
+          });
+        }
 
     const page = Math.max(1, Number(options?.page) || 1);
-    const limit = Math.max(1, Math.min(100, Number(options?.limit) || 20));
-    const skip = (page - 1) * limit;
+        const limit = Math.max(1, Math.min(100, Number(options?.limit) || 20));
+        const skip = (page - 1) * limit;
 
-    const baseWhere: any = { recipientId };
-    if (options?.status) {
-      baseWhere.status = options.status;
-    }
-    if (options?.documentType && (options.documentType as any) !== 'Todos') {
+        const baseWhere: any = { recipientId };
+        if(options?.status) {
+          baseWhere.status = options.status;
+        }
+    if(options?.documentType && (options.documentType as any) !== 'Todos') {
       baseWhere.documentType = options.documentType;
     }
     if (options?.from || options?.to) {
@@ -341,11 +355,14 @@ export class DocumentsService {
       take: limit,
     });
 
+    const stats = await this.calculateFilterStats(where, total, options?.status);
+
     return {
       data,
       total,
       page,
       totalPages: Math.ceil(total / limit) || 1,
+      stats,
     };
   }
 
@@ -360,78 +377,121 @@ export class DocumentsService {
     search?: string;
     from?: string;
     to?: string;
-  }): Promise<{ data: DocumentVerification[]; total: number; page: number; totalPages: number }> {
+  }): Promise<{
+    data: DocumentVerification[];
+    total: number;
+    page: number;
+    totalPages: number;
+    stats: {
+      total: number;
+      validos: number;
+      revocados: number;
+      uniqueRecipients: number;
+    };
+  }> {
     const page = Math.max(1, Number(options?.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(options?.limit) || 20));
     const skip = (page - 1) * limit;
 
     const baseWhere: any = {};
-    if (options?.status) {
+    if(options?.status) {
       baseWhere.status = options.status;
     }
-    if (options?.documentType && (options.documentType as any) !== 'Todos') {
-      baseWhere.documentType = options.documentType;
-    }
-    if (options?.from || options?.to) {
-      const fromDate = options?.from ? new Date(options.from) : new Date(0);
-      const toDate = options?.to ? new Date(options.to) : new Date('2099-12-31T23:59:59.999Z');
-      baseWhere.issuedAt = Between(fromDate, toDate);
-    }
+    if(options?.documentType && (options.documentType as any) !== 'Todos') {
+  baseWhere.documentType = options.documentType;
+}
+if (options?.from || options?.to) {
+  const fromDate = options?.from ? new Date(options.from) : new Date(0);
+  const toDate = options?.to ? new Date(options.to) : new Date('2099-12-31T23:59:59.999Z');
+  baseWhere.issuedAt = Between(fromDate, toDate);
+}
 
-    let where: any = baseWhere;
-    const trimmed = options?.search?.trim();
-    if (trimmed) {
-      const cleanSearch = `%${trimmed}%`;
-      const isCedulaPattern = /^[VEJG]?[-.\s]*\d[\d.\s]*$/i.test(trimmed);
-      const rawDigits = trimmed.replace(/\D/g, '');
+let where: any = baseWhere;
+const trimmed = options?.search?.trim();
+if (trimmed) {
+  const cleanSearch = `%${trimmed}%`;
+  const isCedulaPattern = /^[VEJG]?[-.\s]*\d[\d.\s]*$/i.test(trimmed);
+  const rawDigits = trimmed.replace(/\D/g, '');
 
-      // Requisito 1.1: Búsqueda por input restringida estrictamente al destinatario
-      const searchConditions: any[] = [
-        { ...baseWhere, recipientName: ILike(cleanSearch) },
-      ];
+  // Requisito 1.1: Búsqueda por input restringida estrictamente al destinatario
+  const searchConditions: any[] = [
+    { ...baseWhere, recipientName: ILike(cleanSearch) },
+  ];
 
-      if (isCedulaPattern && rawDigits) {
-        searchConditions.push(
-          { ...baseWhere, recipientIdentifier: ILike(`%${rawDigits}%`) },
-          { ...baseWhere, recipientIdentifier: ILike(cleanSearch) },
-        );
-      } else {
-        searchConditions.push({
-          ...baseWhere,
-          recipientIdentifier: ILike(cleanSearch),
-        });
-      }
+  if (isCedulaPattern && rawDigits) {
+    searchConditions.push(
+      { ...baseWhere, recipientIdentifier: ILike(`%${rawDigits}%`) },
+      { ...baseWhere, recipientIdentifier: ILike(cleanSearch) },
+    );
+  } else {
+    searchConditions.push({
+      ...baseWhere,
+      recipientIdentifier: ILike(cleanSearch),
+    });
+  }
 
-      where = searchConditions;
-    }
+  where = searchConditions;
+}
 
-    const [data, total] = await this.docVerificationRepo.findAndCount({
+const [data, total] = await this.docVerificationRepo.findAndCount({
+  where,
+  order: { issuedAt: 'DESC' },
+  skip,
+  take: limit,
+});
+
+const stats = await this.calculateFilterStats(where, total, options?.status);
+
+return {
+  data,
+  total,
+  page,
+  totalPages: Math.ceil(total / limit) || 1,
+  stats,
+};
+  }
+
+  private async calculateFilterStats(
+  where: any,
+  total: number,
+  status ?: DocumentStatus,
+): Promise < { total: number; validos: number; revocados: number; uniqueRecipients: number } > {
+  let validos = 0;
+  let revocados = 0;
+  if(total > 0) {
+  if (status === DocumentStatus.VALID) {
+    validos = total;
+    revocados = 0;
+  } else if (status === DocumentStatus.REVOKED) {
+    validos = 0;
+    revocados = total;
+  } else {
+    const validWhere = Array.isArray(where)
+      ? where.map((cond) => ({ ...cond, status: DocumentStatus.VALID }))
+      : { ...where, status: DocumentStatus.VALID };
+    validos = (await this.docVerificationRepo.count({ where: validWhere })) || 0;
+    revocados = total - validos;
+  }
+}
+
+let uniqueRecipients = 0;
+if (total > 0) {
+  const distinctDocs =
+    (await this.docVerificationRepo.find({
       where,
-      order: { issuedAt: 'DESC' },
-      skip,
-      take: limit,
-    });
+      select: { recipientIdentifier: true, recipientId: true },
+    })) || [];
+  uniqueRecipients = new Set(
+    distinctDocs.map((r) => r.recipientId || r.recipientIdentifier).filter(Boolean),
+  ).size;
+}
 
-    return {
-      data,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit) || 1,
-    };
+return {
+  total,
+  validos,
+  revocados,
+  uniqueRecipients,
+};
   }
 
-  /**
-   * Returns verification statistics (total, valid, revoked).
-   */
-  async getStats(): Promise<{ total: number; valid: number; revoked: number }> {
-    const total = await this.docVerificationRepo.count();
-    const valid = await this.docVerificationRepo.count({
-      where: { status: DocumentStatus.VALID },
-    });
-    const revoked = await this.docVerificationRepo.count({
-      where: { status: DocumentStatus.REVOKED },
-    });
-
-    return { total, valid, revoked };
-  }
 }

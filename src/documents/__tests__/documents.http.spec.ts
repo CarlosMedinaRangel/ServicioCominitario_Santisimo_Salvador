@@ -175,37 +175,6 @@ describe('DocumentsController (Exhaustive HTTP Integration with Supertest)', () 
   });
 
   // ════════════════════════════════════════════════════════════════════════════════
-  // 2. GET /documents/stats - Verification Statistics
-  // ════════════════════════════════════════════════════════════════════════════════
-  describe('GET /documents/stats', () => {
-    it('should return 401 Unauthorized when unauthenticated', async () => {
-      await request(app.getHttpServer())
-        .get('/documents/stats')
-        .expect(401);
-    });
-
-    it('should return 403 Forbidden when standard user requests stats', async () => {
-      await request(app.getHttpServer())
-        .get('/documents/stats')
-        .set('Authorization', 'Bearer user-token')
-        .expect(403);
-    });
-
-    it('should return 200 OK with statistics for admin', async () => {
-      const stats = { total: 45, valid: 40, revoked: 5 };
-      (mockDocumentsService.getStats as jest.Mock).mockResolvedValue(stats);
-
-      const res = await request(app.getHttpServer())
-        .get('/documents/stats')
-        .set('Authorization', 'Bearer admin-token')
-        .expect(200);
-
-      expect(res.body).toEqual(stats);
-      expect(mockDocumentsService.getStats).toHaveBeenCalled();
-    });
-  });
-
-  // ════════════════════════════════════════════════════════════════════════════════
   // 3. GET /documents - Paginated Verification Records
   // ════════════════════════════════════════════════════════════════════════════════
   describe('GET /documents', () => {
