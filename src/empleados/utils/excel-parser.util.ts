@@ -11,6 +11,7 @@ export interface UploadResult {
   created: number;
   updated: number;
   errors: UploadError[];
+  fileName?: string;
 }
 
 /**

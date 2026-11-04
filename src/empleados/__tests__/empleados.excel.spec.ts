@@ -1,5 +1,5 @@
 import { Readable } from 'stream';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import * as XLSX from 'xlsx';
 import { ExcelUploadService } from '../services/excel-upload.service';
 import { Employee } from '../entities/employee.entity';
@@ -36,6 +36,7 @@ describe('EmpleadosService - Excel Bulk Upload (uploadFile)', () => {
   let service: ExcelUploadService;
   let mockEmployeeRepo: MockType<Repository<Employee>>;
   let mockUserRepo: MockType<Repository<User>>;
+  let mockDataSource: MockType<DataSource>;
 
   const mapping = {
     cedula: 0,
@@ -64,6 +65,7 @@ describe('EmpleadosService - Excel Bulk Upload (uploadFile)', () => {
       userRepo: mockUserRepo,
     });
     service = module.excelUploadService;
+    mockDataSource = module.mocks.dataSource;
   });
 
   it('should record an error if a row has neither email nor cedula', async () => {
@@ -83,6 +85,7 @@ describe('EmpleadosService - Excel Bulk Upload (uploadFile)', () => {
       field: 'email/cedula',
       message: 'Email o cédula es requerido',
     });
+    expect(mockDataSource.transaction).toHaveBeenCalled();
   });
 
   it('should create new user and new employee when neither exists in database', async () => {
@@ -100,6 +103,7 @@ describe('EmpleadosService - Excel Bulk Upload (uploadFile)', () => {
     expect(result.created).toBe(1);
     expect(result.updated).toBe(0);
     expect(result.errors).toHaveLength(0);
+    expect(mockDataSource.transaction).toHaveBeenCalled();
 
     expect(mockUserRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -143,6 +147,7 @@ describe('EmpleadosService - Excel Bulk Upload (uploadFile)', () => {
     expect(result.created).toBe(0);
     expect(result.updated).toBe(1);
     expect(result.errors).toHaveLength(0);
+    expect(mockDataSource.transaction).toHaveBeenCalled();
 
     expect(mockUserRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -173,5 +178,29 @@ describe('EmpleadosService - Excel Bulk Upload (uploadFile)', () => {
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0].row).toBe(2);
     expect(result.errors[0].message).toContain('DB Connection Timeout');
+    expect(mockDataSource.transaction).toHaveBeenCalled();
+  });
+
+  it('should atomically roll back entire batch when one row fails in a multi-row upload', async () => {
+    // Fila 1 es válida, Fila 2 falla por cédula/email faltante
+    (mockUserRepo.findOneBy as jest.Mock).mockResolvedValue(null);
+    (mockEmployeeRepo.findOneBy as jest.Mock).mockResolvedValue(null);
+
+    const file = createExcelFileBuffer([
+      ['Cédula', 'Nombre Completo', 'Email', 'Cargo', 'Fecha Ingreso', 'Horas'],
+      ['V-11111111', 'Empleado Uno Valido', 'uno@santisimo.edu', 'Docente', '2023-01-15', 8],
+      ['', 'Empleado Dos Invalido', '', 'Docente', '2023-01-15', 8],
+    ]);
+
+    const result = await service.uploadFile(file, mapping);
+
+    // Debido a la transacción atómica, ningún registro debe quedar guardado (created = 0, updated = 0)
+    expect(result.success).toBe(false);
+    expect(result.created).toBe(0);
+    expect(result.updated).toBe(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].row).toBe(3);
+    expect(result.errors[0].field).toBe('email/cedula');
+    expect(mockDataSource.transaction).toHaveBeenCalled();
   });
 });

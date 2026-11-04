@@ -100,7 +100,22 @@ export async function createEmpleadosServiceTestModule(
       decryptPayload: jest.fn(),
     },
     dataSource: overrides.dataSource ?? {
-      transaction: jest.fn((cb: (em: unknown) => unknown) => cb({})),
+      transaction: jest.fn(async (cb: (em: unknown) => unknown) => {
+        const manager = {
+          getRepository: jest.fn((entityClass) => {
+            if (entityClass === User) return mocks.userRepo;
+            if (entityClass === Employee) return mocks.employeeRepo;
+            return null;
+          }),
+          findOne: jest.fn(),
+          findOneBy: jest.fn(),
+          create: jest.fn((_, dto) => dto),
+          save: jest.fn((entity) => Promise.resolve(entity)),
+          update: jest.fn(),
+          delete: jest.fn(),
+        };
+        return await cb(manager);
+      }),
     },
     activityService: overrides.activityService ?? {
       log: jest.fn(),
