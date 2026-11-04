@@ -77,7 +77,7 @@ describe('ActivityService', () => {
       (mockActivityRepo.save as jest.Mock).mockRejectedValue(new Error('DB Connection Dropped'));
 
       // Should not throw
-      await expect(service.log(MOCK_USER_ID, input)).resolves.not.toThrow();
+      await expect(service.log(MOCK_USER_ID, input)).resolves.toBeUndefined();
     });
   });
 
