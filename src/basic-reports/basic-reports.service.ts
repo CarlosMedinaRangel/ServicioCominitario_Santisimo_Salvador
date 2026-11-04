@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { EmpleadosService } from 'src/empleados/empleados.service';
+import { EmpleadosService } from 'src/empleados/services/empleados.service';
 import { PrinterService } from 'src/printer/printer.service';
 import { TDocumentDefinitions } from 'src/interfaces/pdfmake.interface';
 import { getHelloWorldReport } from 'src/reports/helloWorld.report';

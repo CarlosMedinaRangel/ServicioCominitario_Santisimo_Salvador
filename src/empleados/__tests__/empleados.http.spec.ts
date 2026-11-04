@@ -11,7 +11,9 @@ import { AuthGuard } from '@nestjs/passport';
 import request from 'supertest';
 import cookieParser from 'cookie-parser';
 import { EmpleadosController } from '../empleados.controller';
-import { EmpleadosService } from '../empleados.service';
+import { EmpleadosService } from '../services/empleados.service';
+import { ConstanciaService } from '../services/constancia.service';
+import { ExcelUploadService } from '../services/excel-upload.service';
 import {
   createMockUser,
   createMockAdminUser,
@@ -22,6 +24,8 @@ import { createMockEmployee } from '../../../test/fixtures/employee.fixture';
 describe('EmpleadosController (Exhaustive HTTP Integration with Supertest)', () => {
   let app: INestApplication;
   let mockEmpleadosService: MockType<EmpleadosService>;
+  let mockConstanciaService: MockType<ConstanciaService>;
+  let mockExcelUploadService: MockType<ExcelUploadService>;
 
   const mockNormalUser = createMockUser({
     id: 'user-uuid-1',
@@ -59,14 +63,22 @@ describe('EmpleadosController (Exhaustive HTTP Integration with Supertest)', () 
       findSchedules: jest.fn(),
       findGroups: jest.fn(),
       findActivities: jest.fn(),
-      uploadFile: jest.fn(),
+    };
+
+    mockConstanciaService = {
       ConstanciaEmpleadoByID: jest.fn(),
+    };
+
+    mockExcelUploadService = {
+      uploadFile: jest.fn(),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [EmpleadosController],
       providers: [
         { provide: EmpleadosService, useValue: mockEmpleadosService },
+        { provide: ConstanciaService, useValue: mockConstanciaService },
+        { provide: ExcelUploadService, useValue: mockExcelUploadService },
         Reflector,
       ],
     })

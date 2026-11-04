@@ -1,5 +1,5 @@
 import { Repository } from 'typeorm';
-import { EmpleadosService } from '../empleados.service';
+import { ConstanciaService } from '../services/constancia.service';
 import { Employee } from '../entities/employee.entity';
 import { PrinterService } from '../../printer/printer.service';
 import { DocumentsService } from '../../documents/documents.service';
@@ -12,7 +12,7 @@ import { createMockDocumentVerification } from '../../../test/fixtures/document.
 import { createEmpleadosServiceTestModule } from '../../../test/fixtures/empleados-service.factory';
 
 describe('EmpleadosService - Constancias & Cryptographic QR PDF (Test 11 & 12)', () => {
-  let service: EmpleadosService;
+  let service: ConstanciaService;
   let mockEmployeeRepo: MockType<Repository<Employee>>;
   let mockPrinterService: MockType<PrinterService>;
   let mockDocumentsService: MockType<DocumentsService>;
@@ -61,7 +61,7 @@ describe('EmpleadosService - Constancias & Cryptographic QR PDF (Test 11 & 12)',
       cryptoService: mockCryptoService,
       activityService: mockActivityService,
     });
-    service = module.service;
+    service = module.constanciaService;
   });
 
   it('should issue cryptographic seal with DocumentsService, generate PDF and log activity', async () => {

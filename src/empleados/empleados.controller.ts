@@ -14,7 +14,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { EmpleadosService } from './empleados.service';
+import { EmpleadosService } from './services/empleados.service';
+import { ConstanciaService } from './services/constancia.service';
+import { ExcelUploadService } from './services/excel-upload.service';
 import { CreateEmpleadoDto } from './dto/create-empleado.dto';
 import { UpdateEmpleadoDto } from './dto/update-empleado.dto';
 import type { Response } from 'express';
@@ -40,7 +42,11 @@ import { User } from 'src/auth/entities/auth.entity';
 @ApiTags('empleados')
 @Controller('empleados')
 export class EmpleadosController {
-  constructor(private readonly empleadosService: EmpleadosService) {}
+  constructor(
+    private readonly empleadosService: EmpleadosService,
+    private readonly constanciaService: ConstanciaService,
+    private readonly excelUploadService: ExcelUploadService,
+  ) {}
 
   @Post()
   @Auth(ValidRoles.admin)
@@ -135,7 +141,7 @@ export class EmpleadosController {
         'El campo "mapping" debe ser un JSON válido',
       );
     }
-    return this.empleadosService.uploadFile(file, mapping);
+    return this.excelUploadService.uploadFile(file, mapping);
   }
 
   @Patch('me')
@@ -321,7 +327,7 @@ export class EmpleadosController {
     @Query('employerCompany') employerCompany?: string,
     @Query('documentId') documentId?: string,
   ) {
-    const pdfDoc = await this.empleadosService.ConstanciaEmpleadoByID(id, {
+    const pdfDoc = await this.constanciaService.ConstanciaEmpleadoByID(id, {
       month,
       employerName,
       employerPosition,

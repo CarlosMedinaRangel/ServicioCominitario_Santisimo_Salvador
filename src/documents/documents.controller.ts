@@ -65,15 +65,6 @@ export class DocumentsController {
     return this.documentsService.verifyDocument(verifyDto.code);
   }
 
-  @Get('stats')
-  @Auth(ValidRoles.admin)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Estadísticas y conteo global de comprobantes emitidos (Solo Administrador)' })
-  @ApiResponse({ status: 200, description: 'Totales de constancias emitidas, válidas y revocadas.' })
-  getStats() {
-    return this.documentsService.getStats();
-  }
-
   @Get()
   @Auth(ValidRoles.admin)
   @ApiBearerAuth()

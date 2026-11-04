@@ -1,5 +1,5 @@
 import { Repository } from 'typeorm';
-import { EmpleadosService } from '../empleados.service';
+import { EmpleadosService } from '../services/empleados.service';
 import { Schedule } from '../entities/schedule.entity';
 import { Group } from '../entities/group.entity';
 import { Activity } from '../entities/activity.entity';

@@ -63,8 +63,8 @@
 **Goal:** Decompose `empleados.service.ts` into 4 focused domain services, wrap Excel import in atomic transactions, and introduce `AcademicPeriod` entity.
 
 ### Tasks:
-- [ ] Fix D-07: Decompose `empleados.service.ts` (851 lines -> `EmpleadosCrudService`, `ConstanciaService`, `ExcelUploadService`, `EmployeeActivityService`)
-- [ ] Fix D-09: Extract `ConstanciaService` (isolate pdfmake reports and cryptographic QR seal issuance from CRUD)
+- [x] Fix D-07: Decompose `empleados.service.ts` (788 lines -> `services/empleados.service.ts`, `services/constancia.service.ts`, `services/excel-upload.service.ts`, `utils/excel-parser.util.ts`)
+- [x] Fix D-09: Extract `ConstanciaService` (isolate pdfmake reports and cryptographic QR seal issuance from CRUD)
 - [ ] Fix D-28: Wrap Excel upload in atomic `dataSource.transaction` / `QueryRunner` with rollback on error
 - [ ] Fix D-29: Create custom repository classes extending `Repository<T>` for domain queries
 - [ ] Create `AcademicPeriod` entity (Year/Lapso) to historically bind `schedules` and `groups` without overwriting past records

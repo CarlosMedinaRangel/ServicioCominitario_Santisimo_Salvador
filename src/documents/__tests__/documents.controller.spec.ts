@@ -14,7 +14,6 @@ describe('DocumentsController', () => {
   beforeEach(() => {
     mockDocumentsService = {
       verifyDocument: jest.fn(),
-      getStats: jest.fn(),
       findAll: jest.fn(),
       revokeDocument: jest.fn(),
       findByRecipient: jest.fn(),
@@ -39,18 +38,6 @@ describe('DocumentsController', () => {
 
       expect(mockDocumentsService.verifyDocument).toHaveBeenCalledWith(verifyDto.code);
       expect(result).toBe(mockResult);
-    });
-  });
-
-  describe('getStats', () => {
-    it('should return aggregated document stats from documentsService', async () => {
-      const mockStats = { total: 120, valid: 110, revoked: 10 };
-      (mockDocumentsService.getStats as jest.Mock).mockResolvedValue(mockStats);
-
-      const result = await controller.getStats();
-
-      expect(mockDocumentsService.getStats).toHaveBeenCalled();
-      expect(result).toBe(mockStats);
     });
   });
 

@@ -1,7 +1,7 @@
 import { Readable } from 'stream';
 import { Repository } from 'typeorm';
 import * as XLSX from 'xlsx';
-import { EmpleadosService } from '../empleados.service';
+import { ExcelUploadService } from '../services/excel-upload.service';
 import { Employee } from '../entities/employee.entity';
 import { User } from '../../auth/entities/auth.entity';
 import { createMockUser, MockType } from '../../../test/fixtures/user.fixture';
@@ -33,7 +33,7 @@ function createExcelFileBuffer(rows: unknown[][]): Express.Multer.File {
 }
 
 describe('EmpleadosService - Excel Bulk Upload (uploadFile)', () => {
-  let service: EmpleadosService;
+  let service: ExcelUploadService;
   let mockEmployeeRepo: MockType<Repository<Employee>>;
   let mockUserRepo: MockType<Repository<User>>;
 
@@ -63,7 +63,7 @@ describe('EmpleadosService - Excel Bulk Upload (uploadFile)', () => {
       employeeRepo: mockEmployeeRepo,
       userRepo: mockUserRepo,
     });
-    service = module.service;
+    service = module.excelUploadService;
   });
 
   it('should record an error if a row has neither email nor cedula', async () => {

@@ -5,41 +5,21 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateEmpleadoDto } from './dto/create-empleado.dto';
-import { UpdateEmpleadoDto } from './dto/update-empleado.dto';
+import { CreateEmpleadoDto } from '../dto/create-empleado.dto';
+import { UpdateEmpleadoDto } from '../dto/update-empleado.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, DataSource, In, ILike } from 'typeorm';
-import { Employee } from './entities/employee.entity';
-import { Schedule } from './entities/schedule.entity';
-import { Group } from './entities/group.entity';
-import { Activity } from './entities/activity.entity';
+import { Repository, DataSource, In, ILike } from 'typeorm';
+import { Employee } from '../entities/employee.entity';
+import { Schedule } from '../entities/schedule.entity';
+import { Group } from '../entities/group.entity';
+import { Activity } from '../entities/activity.entity';
 import { User } from 'src/auth/entities/auth.entity';
 import { IErrorsTypeORM } from 'src/interfaces/error.response';
-import { PrinterService } from 'src/printer/printer.service';
-import { employementLetterReportByID } from 'src/reports/employementLetterByID.report';
-import { constanciaMensualReport } from 'src/reports/constanciaMensual.report';
-import { DocumentsService } from 'src/documents/documents.service';
-import { DocumentType, RecipientType, DocumentStatus } from 'src/documents/entities/document-verification.entity';
 import { CryptoService } from 'src/crypto/crypto.service';
-import * as bcrypt from 'bcrypt';
-import * as XLSX from 'xlsx';
 import {
   ActivityService,
   LogActivityInput,
-} from './activity-service/activity-service.service';
-
-export interface UploadError {
-  row: number;
-  field: string;
-  message: string;
-}
-
-export interface UploadResult {
-  success: boolean;
-  created: number;
-  updated: number;
-  errors: UploadError[];
-}
+} from '../activity-service/activity-service.service';
 
 @Injectable()
 export class EmpleadosService {
@@ -56,8 +36,6 @@ export class EmpleadosService {
     private readonly activityRepository: Repository<Activity>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly PrinterService: PrinterService,
-    private readonly documentsService: DocumentsService,
     private readonly cryptoService: CryptoService,
     private readonly dataSource: DataSource,
     private readonly activityService: ActivityService,
@@ -309,150 +287,6 @@ export class EmpleadosService {
     });
   }
 
-  async ConstanciaEmpleadoByID(
-    id: string,
-    options?: {
-      month?: string;
-      employerName?: string;
-      employerPosition?: string;
-      employerCompany?: string;
-      documentId?: string;
-    },
-  ) {
-    const employee = await this.findOne(id);
-    const user = employee.user;
-
-    const employerName = options?.employerName || 'Carlos Medina';
-    const employerPosition = options?.employerPosition || 'Director';
-    const employerCompany = options?.employerCompany || 'Santisimo Salvador';
-
-    let docRecordId: string;
-    let qrDataUrl: string;
-    let effectiveIssueDate: Date | string;
-
-    if (options?.documentId) {
-      // 1. Reconstruir documento existente desde el registro criptográfico
-      const existing = await this.documentsService.findOne(options.documentId);
-      if (!existing) {
-        throw new NotFoundException(
-          `Documento con ID ${options.documentId} no encontrado.`,
-        );
-      }
-      if (existing.status === DocumentStatus.REVOKED) {
-        throw new BadRequestException(
-          'No se puede generar la constancia de un documento revocado o anulado.',
-        );
-      }
-
-      // 2. Desencriptar sello criptográfico AES-256-GCM para verificar integridad y extraer fecha inalterable
-      const payload = this.cryptoService.decryptPayload(
-        existing.verificationCode,
-        'DOC',
-      );
-      effectiveIssueDate = payload.issuedAt || existing.issuedAt;
-
-      // 3. Regenerar QR desde el sello existente sin duplicar registros en base de datos
-      qrDataUrl = await this.documentsService.getQrDataUrl(
-        existing.verificationCode,
-      );
-      docRecordId = existing.id;
-    } else {
-      // Emisión de documento nuevo (ej. desde modal de administración)
-      const issued = await this.documentsService.issueDocument({
-        documentType: DocumentType.CONSTANCIA_TRABAJO,
-        recipientType: RecipientType.EMPLOYEE,
-        recipientId: employee.userId,
-        recipientIdentifier: user.cedula || 'N/A',
-        recipientName: user.fullName,
-        issuedByName: `${employerName} (${employerPosition})`,
-        metadata: {
-          empresa: employerCompany,
-          cargo: employee.position,
-          horas: employee.hours_per_day,
-          horario: employee.work_schedule,
-          fechaInicio: employee.start_date,
-          mes: options?.month || null,
-        },
-      });
-      docRecordId = issued.record.id;
-      qrDataUrl = issued.qrDataUrl;
-      effectiveIssueDate = issued.record.issuedAt;
-    }
-
-    if (options?.month) {
-      const [yearStr, monthStr] = options.month.split('-');
-      const year = parseInt(yearStr, 10);
-      const mes = parseInt(monthStr, 10);
-
-      const startDate = new Date(year, mes - 1, 1);
-      const endDate = new Date(year, mes, 0, 23, 59, 59);
-
-      const activities = await this.activityRepository.find({
-        where: {
-          employeeId: employee.userId,
-          timestamp: Between(startDate, endDate),
-        },
-        order: { timestamp: 'DESC' },
-      });
-
-      const docDefinition = constanciaMensualReport({
-        employerName,
-        employerPosition,
-        employerCompany,
-        employeeName: user.fullName,
-        employeeCedula: user.cedula || 'N/A',
-        employeePosition: employee.position,
-        employeeStartDate: employee.start_date,
-        employeeHours: employee.hours_per_day,
-        employeeWorkSchedule: employee.work_schedule,
-        month: `${monthStr}-${yearStr}`,
-        qrDataUrl,
-        verificationId: docRecordId,
-        activities: activities.map((a) => ({
-          tipo: a.tipo,
-          descripcion: a.descripcion,
-          detalle: a.detalle,
-          timestamp: a.timestamp,
-        })),
-      });
-
-      const pdf = this.PrinterService.createPdf(docDefinition);
-      void this.activityService.log(employee.userId, {
-        tipo: 'Constancia Generada',
-        descripcion: `Constancia mensual de ${monthStr}-${yearStr}`,
-        detalle: `Firmada por ${employerName} (${employerPosition})`,
-        destacada: true,
-      });
-
-      return pdf;
-    }
-
-    const docDefinition = employementLetterReportByID({
-      employerName,
-      employerPosition,
-      employerCompany,
-      employeeName: user.fullName,
-      employeeCedula: user.cedula || 'N/A',
-      employeePosition: employee.position,
-      employeeStartDate: employee.start_date,
-      employeeHours: employee.hours_per_day,
-      employeeWorkSchedule: employee.work_schedule,
-      qrDataUrl,
-      verificationId: docRecordId,
-      issueDate: effectiveIssueDate,
-    });
-
-    const pdf = this.PrinterService.createPdf(docDefinition);
-    void this.activityService.log(employee.userId, {
-      tipo: 'Constancia Generada',
-      descripcion: 'Constancia de trabajo',
-      detalle: `Firmada por ${employerName} (${employerPosition})`,
-      destacada: true,
-    });
-
-    return pdf;
-  }
-
   async update(id: string, updateEmpleadoDto: UpdateEmpleadoDto) {
     const employee = await this.findOne(id);
     const activities: LogActivityInput[] = [];
@@ -695,184 +529,6 @@ export class EmpleadosService {
       this.handleExceptions(error);
     }
   }
-
-  async uploadFile(
-    file: Express.Multer.File,
-    mapping: Record<string, number>,
-  ): Promise<UploadResult> {
-    const workbook = XLSX.read(file.buffer, {
-      type: 'buffer',
-      cellDates: true,
-    });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(sheet, {
-      header: 1,
-    }) as unknown[][];
-
-    const rows = jsonData
-      .slice(1)
-      .filter((r) =>
-        r.some((cell) => cell !== undefined && cell !== null && cell !== ''),
-      );
-
-    let created = 0;
-    let updated = 0;
-    const errors: UploadError[] = [];
-
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const rowNum = i + 2;
-
-      try {
-        const data = this.extractRowData(row, mapping);
-
-        // El upload identifica empleados por cédula (o email si lo incluyeron)
-        if (!data.email && !data.cedula) {
-          errors.push({
-            row: rowNum,
-            field: 'email/cedula',
-            message: 'Email o cédula es requerido',
-          });
-          continue;
-        }
-
-        // ── Buscar o crear usuario ────────────────────────────────────────────
-        let user: User | null = null;
-
-        if (data.email) {
-          user = await this.userRepository.findOneBy({
-            email: String(data.email).toLowerCase().trim(),
-          });
-        }
-        if (!user && data.cedula) {
-          let cedulaLookup = String(data.cedula)
-            .replace(/\./g, '')
-            .toUpperCase();
-          if (!cedulaLookup.startsWith('V')) cedulaLookup = 'V' + cedulaLookup;
-          user = await this.userRepository.findOneBy({ cedula: cedulaLookup });
-        }
-
-        if (user) {
-          const userUpdates: Partial<User> = {};
-          if (data.fullName) userUpdates.fullName = String(data.fullName);
-          if (data.email)
-            userUpdates.email = String(data.email).toLowerCase().trim();
-          if (data.cedula) {
-            let c = String(data.cedula).replace(/\./g, '').toUpperCase();
-            if (!c.startsWith('V')) c = 'V' + c;
-            userUpdates.cedula = c;
-          }
-          if (data.telefono)
-            userUpdates.telefono = String(data.telefono).replace(/\D/g, '');
-          await this.userRepository.save({ ...user, ...userUpdates });
-        } else {
-          const password = data.password
-            ? String(data.password)
-            : `${data.cedula || 'Default'}123!`;
-          const hashedPassword = await bcrypt.hash(password, 10);
-          user = this.userRepository.create({
-            email: String(data.email || `${data.cedula}@santisimo.edu`).toLowerCase().trim(),
-            password: hashedPassword,
-            fullName: String(data.fullName || data.name || 'Sin Nombre'),
-            roles: ['user'],
-            isActive: true,
-          });
-          if (data.cedula) {
-            let c = String(data.cedula).replace(/\./g, '').toUpperCase();
-            if (!c.startsWith('V')) c = 'V' + c;
-            user.cedula = c;
-          }
-          if (data.telefono)
-            user.telefono = String(data.telefono).replace(/\D/g, '');
-          user = await this.userRepository.save(user);
-        }
-
-        // ── Buscar o crear empleado (solo datos base) ─────────────────────────
-        // El upload masivo NO crea schedules ni groups — esos se asignan
-        // después desde el formulario individual, donde tienen sentido anidados.
-        let employee = await this.employeeRepository.findOneBy({
-          userId: user.id,
-        });
-
-        const employeeData: Partial<Employee> = {
-          position: data.position ? String(data.position) : 'General',
-          start_date: data.start_date
-            ? new Date(this.formatDateValue(data.start_date))
-            : new Date(),
-          work_time: data.work_time
-            ? this.normalizeTime(String(data.work_time))
-            : '08:00',
-          hours_per_day: data.hours_per_day ? Number(data.hours_per_day) : 8,
-          work_schedule: data.work_schedule
-            ? String(data.work_schedule)
-            : 'Lunes a Viernes, 8am - 4pm',
-        };
-
-        if (employee) {
-          await this.employeeRepository.save({
-            ...employee,
-            ...employeeData,
-            userId: user.id,
-          });
-          updated++;
-        } else {
-          const newEmployee = this.employeeRepository.create({
-            userId: user.id,
-            ...employeeData,
-          } as Employee);
-          await this.employeeRepository.save(newEmployee);
-          created++;
-        }
-      } catch (error: any) {
-        errors.push({
-          row: rowNum,
-          field: 'general',
-          message: error.message ?? 'Error desconocido',
-        });
-      }
-    }
-
-    return { success: errors.length === 0, created, updated, errors };
-  }
-
-  // ── Helpers privados ──────────────────────────────────────────────────────
-
-  private extractRowData(
-    row: unknown[],
-    mapping: Record<string, number>,
-  ): Record<string, unknown> {
-    const data: Record<string, unknown> = {};
-    for (const [field, colIndex] of Object.entries(mapping)) {
-      if (colIndex >= 0 && colIndex < row.length) {
-        data[field] = row[colIndex];
-      }
-    }
-    return data;
-  }
-
-  private formatDateValue(value: unknown): string {
-    if (value instanceof Date) return value.toISOString().split('T')[0];
-    if (typeof value === 'number') {
-      const date = XLSX.SSF?.parse_date_code?.(value);
-      if (date?.y && date?.m && date?.d) {
-        return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
-      }
-    }
-    if (typeof value === 'string') {
-      const parsed = new Date(value);
-      if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
-      return value;
-    }
-    return '';
-  }
-
-  private normalizeTime(value: string): string {
-    const match = value.match(/^(\d{1,2}):(\d{2})/);
-    if (!match) return value;
-    return `${match[1].padStart(2, '0')}:${match[2]}`;
-  }
-
 
   private handleExceptions(error: IErrorsTypeORM) {
     if (error.code === '23505') throw new BadRequestException(error.detail);

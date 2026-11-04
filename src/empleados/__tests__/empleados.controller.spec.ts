@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { EmpleadosController } from '../empleados.controller';
-import { EmpleadosService } from '../empleados.service';
+import { EmpleadosService } from '../services/empleados.service';
+import { ConstanciaService } from '../services/constancia.service';
+import { ExcelUploadService } from '../services/excel-upload.service';
 import { CreateEmpleadoDto } from '../dto/create-empleado.dto';
 import { UpdateEmpleadoDto } from '../dto/update-empleado.dto';
 import { createMockUser } from '../../../test/fixtures/user.fixture';
@@ -10,11 +12,12 @@ import { createValidDto } from '../../../test/fixtures/dto-factory.helper';
 describe('EmpleadosController', () => {
   let controller: EmpleadosController;
   let mockEmpleadosService: jest.Mocked<Partial<EmpleadosService>>;
+  let mockConstanciaService: jest.Mocked<Partial<ConstanciaService>>;
+  let mockExcelUploadService: jest.Mocked<Partial<ExcelUploadService>>;
 
   beforeEach(() => {
     mockEmpleadosService = {
       create: jest.fn(),
-      uploadFile: jest.fn(),
       updateByUserId: jest.fn(),
       getCounts: jest.fn(),
       findAll: jest.fn(),
@@ -27,7 +30,19 @@ describe('EmpleadosController', () => {
       remove: jest.fn(),
     };
 
-    controller = new EmpleadosController(mockEmpleadosService as EmpleadosService);
+    mockConstanciaService = {
+      ConstanciaEmpleadoByID: jest.fn(),
+    };
+
+    mockExcelUploadService = {
+      uploadFile: jest.fn(),
+    };
+
+    controller = new EmpleadosController(
+      mockEmpleadosService as EmpleadosService,
+      mockConstanciaService as ConstanciaService,
+      mockExcelUploadService as ExcelUploadService,
+    );
   });
 
   describe('create', () => {
@@ -65,11 +80,11 @@ describe('EmpleadosController', () => {
         updated: 2,
         errors: [],
       };
-      (mockEmpleadosService.uploadFile as jest.Mock).mockResolvedValue(mockUploadResult);
+      (mockExcelUploadService.uploadFile as jest.Mock).mockResolvedValue(mockUploadResult);
 
       const result = await controller.upload(mockFile, mappingRaw);
 
-      expect(mockEmpleadosService.uploadFile).toHaveBeenCalledWith(mockFile, {
+      expect(mockExcelUploadService.uploadFile).toHaveBeenCalledWith(mockFile, {
         cedula: 0,
         fullName: 1,
         email: 2,
@@ -86,7 +101,7 @@ describe('EmpleadosController', () => {
       await expect(controller.upload(mockFile, invalidJson)).rejects.toThrow(
         'El campo "mapping" debe ser un JSON válido',
       );
-      expect(mockEmpleadosService.uploadFile).not.toHaveBeenCalled();
+      expect(mockExcelUploadService.uploadFile).not.toHaveBeenCalled();
     });
   });
 
