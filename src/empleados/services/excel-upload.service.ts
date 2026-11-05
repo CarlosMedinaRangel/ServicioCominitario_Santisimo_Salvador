@@ -36,6 +36,7 @@ export class ExcelUploadService {
     const workbook = XLSX.read(file.buffer, {
       type: 'buffer',
       cellDates: true,
+      codepage: 65001,
     });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
@@ -139,9 +140,11 @@ export class ExcelUploadService {
 
             const employeeData: Partial<Employee> = {
               position: data.position ? String(data.position) : 'General',
-              start_date: data.start_date
-                ? new Date(formatDateValue(data.start_date))
-                : new Date(),
+              start_date: (() => {
+                const dateStr = formatDateValue(data.start_date);
+                const parsed = dateStr ? new Date(`${dateStr}T00:00:00.000Z`) : new Date();
+                return isNaN(parsed.getTime()) ? new Date() : parsed;
+              })(),
               work_time: data.work_time
                 ? normalizeTime(String(data.work_time))
                 : '08:00',

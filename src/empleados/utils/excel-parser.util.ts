@@ -34,7 +34,11 @@ export function extractRowData(
  * Convierte valores de fecha crudos de Excel (números de serie, strings o Dates) a formato YYYY-MM-DD
  */
 export function formatDateValue(value: unknown): string {
-  if (value instanceof Date) return value.toISOString().split('T')[0];
+  if (!value) return '';
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return '';
+    return value.toISOString().split('T')[0];
+  }
   if (typeof value === 'number') {
     const date = XLSX.SSF?.parse_date_code?.(value);
     if (date?.y && date?.m && date?.d) {
@@ -42,9 +46,39 @@ export function formatDateValue(value: unknown): string {
     }
   }
   if (typeof value === 'string') {
-    const parsed = new Date(value);
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+
+    // Si es un número serial de Excel como string (ej. "43109" o "43108.99")
+    const numericSerial = Number(trimmed);
+    if (!isNaN(numericSerial) && numericSerial > 1000 && numericSerial < 200000) {
+      const date = XLSX.SSF?.parse_date_code?.(numericSerial);
+      if (date?.y && date?.m && date?.d) {
+        return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+      }
+    }
+
+    // Formato DD/MM/YYYY o D/M/YYYY o DD-MM-YYYY
+    const dmyMatch = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (dmyMatch) {
+      const day = dmyMatch[1].padStart(2, '0');
+      const month = dmyMatch[2].padStart(2, '0');
+      const year = dmyMatch[3];
+      return `${year}-${month}-${day}`;
+    }
+
+    // Formato ISO YYYY-MM-DD o YYYY/MM/DD
+    const ymdMatch = trimmed.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+    if (ymdMatch) {
+      const year = ymdMatch[1];
+      const month = ymdMatch[2].padStart(2, '0');
+      const day = ymdMatch[3].padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    const parsed = new Date(trimmed);
     if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
-    return value;
+    return '';
   }
   return '';
 }

@@ -122,6 +122,7 @@ export class EmpleadosController {
         .addFileTypeValidator({
           fileType:
             /(application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|application\/vnd\.ms-excel|text\/csv|application\/csv)/,
+          fallbackToMimetype: true,
         })
         .addMaxSizeValidator({ maxSize: 50 * 1024 * 1024 })
         .build({ fileIsRequired: true }),
