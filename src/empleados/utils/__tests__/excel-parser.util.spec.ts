@@ -50,6 +50,9 @@ describe('excel-parser.util (Pure Functional Utilities)', () => {
 
     it('should format string date to YYYY-MM-DD', () => {
       expect(formatDateValue('2023-11-20')).toBe('2023-11-20');
+      expect(formatDateValue('15/02/2020')).toBe('2020-02-15');
+      expect(formatDateValue('1/9/2023')).toBe('2023-09-01');
+      expect(formatDateValue('43109')).toBe('2018-01-09');
     });
 
     it('should return empty string for null or undefined', () => {

@@ -36,9 +36,11 @@
 | D-20 | No Dockerfile | `fix-now` | Create for Render deploy |
 | D-26 | `as any` casts in start_date | `resolved` | Removed redundant casts in seed.service.ts |
 | D-27 | bcrypt.hashSync in request path | `resolved` | Migrated to async await bcrypt.hash() across all services and seeders |
-| D-28 | Excel upload executes N+1 queries without atomic transaction | `pre-student-blocker` | Wrap `uploadFile` batch processing in `dataSource.transaction` / `QueryRunner`. Roll back all user/employee mutations atomically on error; optimize lookups with bulk/batch queries |
+| D-28 | Excel upload executes N+1 queries without atomic transaction | `resolved` | Wrapped `uploadFile` batch processing in `dataSource.transaction`. Rolls back all user/employee mutations atomically on any row error; returns original fileName for client feedback |
 | D-29 | Direct generic Repository injection instead of custom repository classes | `pre-student-blocker` | Implement dedicated repository classes extending `Repository<T>` (`EmployeeRepository`, `UserRepository`, etc.) to encapsulate domain queries away from services. Execute in Phase 2 alongside D-07 decomposition to avoid invalidating test mocks prematurely |
 | D-30 | Swagger at /api conflicts | `resolved` | Mounted at /docs in main.ts |
+| D-36 | Trayectoria Laboral Escolar / Historial de Cargos Institucionales (Job/Academic Position History) | `remove-on-real-data` | Found: 2026-11-04. Actualmente la entidad `Employee` es 1:1 con `User` y refleja solo el estado vivo más reciente; al actualizar cargos o datos por CSV/edición se sobreescribe la fila. Se requiere diseñar una tabla histórica (ej. `employee_positions` con `fecha_inicio`, `fecha_fin`, `cargo`, `ano_escolar`) para auditar la carrera docente y ascensos en el tiempo. **Condición:** Abordar una vez se reciban las plantillas y formatos oficiales del Colegio Santísimo Salvador para apegarse a su estructura real. |
+| D-37 | Auto-Mapping de Columnas adaptado a Plantilla XLS/CSV Oficial del Colegio | `remove-on-real-data` | Found: 2026-11-04. El auto-mapeo en `AdminColumnMappingModal.tsx` se limita estrictamente a los títulos exactos vigentes del prototipo (ignorando mayúsculas/minúsculas). **Condición:** Cuando la institución suministre la plantilla oficial de Excel/nómina con sus encabezados reales, actualizar la lista de coincidencia de cabeceras para que coincida de forma 100% nativa con las columnas institucionales. |
 
 ---
 
