@@ -41,6 +41,7 @@
 | D-30 | Swagger at /api conflicts | `resolved` | Mounted at /docs in main.ts |
 | D-36 | Trayectoria Laboral Escolar / Historial de Cargos Institucionales (Job/Academic Position History) | `remove-on-real-data` | Found: 2026-11-04. Actualmente la entidad `Employee` es 1:1 con `User` y refleja solo el estado vivo más reciente; al actualizar cargos o datos por CSV/edición se sobreescribe la fila. Se requiere diseñar una tabla histórica (ej. `employee_positions` con `fecha_inicio`, `fecha_fin`, `cargo`, `ano_escolar`) para auditar la carrera docente y ascensos en el tiempo. **Condición:** Abordar una vez se reciban las plantillas y formatos oficiales del Colegio Santísimo Salvador para apegarse a su estructura real. |
 | D-37 | Auto-Mapping de Columnas adaptado a Plantilla XLS/CSV Oficial del Colegio | `remove-on-real-data` | Found: 2026-11-04. El auto-mapeo en `AdminColumnMappingModal.tsx` se limita estrictamente a los títulos exactos vigentes del prototipo (ignorando mayúsculas/minúsculas). **Condición:** Cuando la institución suministre la plantilla oficial de Excel/nómina con sus encabezados reales, actualizar la lista de coincidencia de cabeceras para que coincida de forma 100% nativa con las columnas institucionales. |
+| D-41 | DeprecationWarning `pg@9.0`: `client.query()` concurrente en `activity-service` | `resolved` | Refactorizado `logMany` para inserción en lote (`save(activities)`) con una sola consulta `findOneBy`, eliminando concurrencia sobre socket de `pg`. |
 
 ---
 
