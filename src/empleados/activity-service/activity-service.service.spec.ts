@@ -18,7 +18,11 @@ describe('ActivityService', () => {
   beforeEach(async () => {
     mockActivityRepo = {
       create: jest.fn((dto) => createMockActivity(dto)),
-      save: jest.fn((entity) => Promise.resolve(createMockActivity(entity))),
+      save: jest.fn((entity) =>
+        Array.isArray(entity)
+          ? Promise.resolve(entity.map((e) => createMockActivity(e)))
+          : Promise.resolve(createMockActivity(entity)),
+      ),
     };
 
     mockEmployeeRepo = {
@@ -82,19 +86,50 @@ describe('ActivityService', () => {
   });
 
   describe('logMany', () => {
-    it('should iterate over all inputs and log each one', async () => {
-      const logSpy = jest.spyOn(service, 'log').mockResolvedValue(undefined);
+    const inputs: LogActivityInput[] = [
+      { tipo: 'A', descripcion: 'Desc A', detalle: 'Det A' },
+      { tipo: 'B', descripcion: 'Desc B', detalle: 'Det B', destacada: true },
+    ];
 
-      const inputs: LogActivityInput[] = [
-        { tipo: 'A', descripcion: 'Desc A', detalle: 'Det A' },
-        { tipo: 'B', descripcion: 'Desc B', detalle: 'Det B' },
-      ];
+    it('should silently return if inputs array is empty', async () => {
+      await service.logMany(MOCK_USER_ID, []);
+
+      expect(mockEmployeeRepo.findOneBy).not.toHaveBeenCalled();
+      expect(mockActivityRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should silently return if employee is not found for userId', async () => {
+      (mockEmployeeRepo.findOneBy as jest.Mock).mockResolvedValue(null);
 
       await service.logMany(MOCK_USER_ID, inputs);
 
-      expect(logSpy).toHaveBeenCalledTimes(2);
-      expect(logSpy).toHaveBeenCalledWith(MOCK_USER_ID, inputs[0]);
-      expect(logSpy).toHaveBeenCalledWith(MOCK_USER_ID, inputs[1]);
+      expect(mockActivityRepo.create).not.toHaveBeenCalled();
+      expect(mockActivityRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should batch create and persist activities in a single save call when employee is found', async () => {
+      const mockEmployee = createMockEmployee({ userId: MOCK_USER_ID });
+      (mockEmployeeRepo.findOneBy as jest.Mock).mockResolvedValue(mockEmployee);
+
+      await service.logMany(MOCK_USER_ID, inputs);
+
+      expect(mockEmployeeRepo.findOneBy).toHaveBeenCalledTimes(1);
+      expect(mockActivityRepo.create).toHaveBeenCalledTimes(2);
+      expect(mockActivityRepo.save).toHaveBeenCalledTimes(1);
+      expect(mockActivityRepo.save).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ employeeId: MOCK_USER_ID, tipo: 'A' }),
+          expect.objectContaining({ employeeId: MOCK_USER_ID, tipo: 'B' }),
+        ]),
+      );
+    });
+
+    it('should catch repository errors silently to never interrupt main operation', async () => {
+      const mockEmployee = createMockEmployee({ userId: MOCK_USER_ID });
+      (mockEmployeeRepo.findOneBy as jest.Mock).mockResolvedValue(mockEmployee);
+      (mockActivityRepo.save as jest.Mock).mockRejectedValue(new Error('Batch insert failure'));
+
+      await expect(service.logMany(MOCK_USER_ID, inputs)).resolves.toBeUndefined();
     });
   });
 });

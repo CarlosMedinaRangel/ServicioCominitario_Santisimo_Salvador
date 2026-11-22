@@ -40,8 +40,29 @@ export class ActivityService {
     }
   }
 
-  // Para loguear varios cambios en una sola llamada
+  // Para loguear varios cambios en una sola llamada (en lote para evitar concurrencia en socket pg)
   async logMany(userId: string, inputs: LogActivityInput[]): Promise<void> {
-    await Promise.all(inputs.map((input) => this.log(userId, input)));
+    if (!inputs || inputs.length === 0) return;
+
+    try {
+      const employee = await this.employeeRepository.findOneBy({ userId });
+      if (!employee) return;
+
+      const now = new Date();
+      const activities = inputs.map((input) =>
+        this.activityRepository.create({
+          employeeId: employee.userId,
+          tipo: input.tipo,
+          descripcion: input.descripcion,
+          detalle: input.detalle,
+          destacada: input.destacada ?? false,
+          timestamp: now,
+        }),
+      );
+
+      await this.activityRepository.save(activities);
+    } catch {
+      // El log nunca debe romper la operación principal
+    }
   }
 }
