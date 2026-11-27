@@ -3,6 +3,7 @@ import {
   INestApplication,
   ValidationPipe,
   UnauthorizedException,
+  ForbiddenException,
   ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -11,13 +12,16 @@ import request from 'supertest';
 import cookieParser from 'cookie-parser';
 import { DocumentsController } from '../documents.controller';
 import { DocumentsService } from '../documents.service';
+import { CryptoService } from '../../crypto/crypto.service';
+import { QrGeneratorService } from '../../crypto/qr-generator.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   createMockUser,
   createMockAdminUser,
   MockType,
 } from '../../../test/fixtures/user.fixture';
 import { createMockDocumentVerification } from '../../../test/fixtures/document.fixture';
-import { DocumentStatus } from '../entities/document-verification.entity';
+import { DocumentVerification, DocumentStatus } from '../entities/document-verification.entity';
 
 describe('DocumentsController (Exhaustive HTTP Integration with Supertest)', () => {
   let app: INestApplication;
@@ -45,9 +49,9 @@ describe('DocumentsController (Exhaustive HTTP Integration with Supertest)', () 
   beforeEach(async () => {
     mockDocumentsService = {
       verifyDocument: jest.fn(),
-      getStats: jest.fn(),
       findAll: jest.fn(),
       revokeDocument: jest.fn(),
+      restoreDocument: jest.fn(),
       findByRecipient: jest.fn(),
       issueDocument: jest.fn(),
     };
@@ -223,11 +227,33 @@ describe('DocumentsController (Exhaustive HTTP Integration with Supertest)', () 
       expect(mockDocumentsService.revokeDocument).not.toHaveBeenCalled();
     });
 
-    it('should return 403 Forbidden when standard user attempts revocation', async () => {
-      await request(app.getHttpServer())
+    it('should return 403 Forbidden when standard user attempts revocation of someone else document', async () => {
+      (mockDocumentsService.revokeDocument as jest.Mock).mockRejectedValue(
+        new ForbiddenException('No tienes permisos para anular documentos de otro destinatario.'),
+      );
+
+      const res = await request(app.getHttpServer())
         .patch(`/documents/${mockDoc.id}/revoke`)
         .set('Authorization', 'Bearer user-token')
         .expect(403);
+
+      expect(res.body.message).toContain('No tienes permisos para anular documentos');
+    });
+
+    it('should return 200 OK when standard user revokes their own document', async () => {
+      const revoked = { ...mockDoc, recipientId: mockNormalUser.id, status: DocumentStatus.REVOKED };
+      (mockDocumentsService.revokeDocument as jest.Mock).mockResolvedValue(revoked);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/documents/${mockDoc.id}/revoke`)
+        .set('Authorization', 'Bearer user-token')
+        .expect(200);
+
+      expect(res.body.status).toBe(DocumentStatus.REVOKED);
+      expect(mockDocumentsService.revokeDocument).toHaveBeenCalledWith(
+        mockDoc.id,
+        expect.objectContaining({ id: mockNormalUser.id }),
+      );
     });
 
     it('should return 200 OK when admin revokes document with valid UUID', async () => {
@@ -240,7 +266,41 @@ describe('DocumentsController (Exhaustive HTTP Integration with Supertest)', () 
         .expect(200);
 
       expect(res.body.status).toBe(DocumentStatus.REVOKED);
-      expect(mockDocumentsService.revokeDocument).toHaveBeenCalledWith(mockDoc.id);
+      expect(mockDocumentsService.revokeDocument).toHaveBeenCalledWith(
+        mockDoc.id,
+        expect.objectContaining({ id: mockAdminUser.id }),
+      );
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // 5. PATCH /documents/:id/restore - Restoration (Admin Only)
+  // ════════════════════════════════════════════════════════════════════════════════
+  describe('PATCH /documents/:id/restore', () => {
+    it('should return 401 Unauthorized when unauthenticated', async () => {
+      await request(app.getHttpServer())
+        .patch(`/documents/${mockDoc.id}/restore`)
+        .expect(401);
+    });
+
+    it('should return 403 Forbidden when standard user attempts restoration', async () => {
+      await request(app.getHttpServer())
+        .patch(`/documents/${mockDoc.id}/restore`)
+        .set('Authorization', 'Bearer user-token')
+        .expect(403);
+    });
+
+    it('should return 200 OK when admin restores document with valid UUID', async () => {
+      const restored = { ...mockDoc, status: DocumentStatus.VALID };
+      (mockDocumentsService.restoreDocument as jest.Mock).mockResolvedValue(restored);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/documents/${mockDoc.id}/restore`)
+        .set('Authorization', 'Bearer admin-token')
+        .expect(200);
+
+      expect(res.body.status).toBe(DocumentStatus.VALID);
+      expect(mockDocumentsService.restoreDocument).toHaveBeenCalledWith(mockDoc.id);
     });
   });
 
@@ -278,5 +338,135 @@ describe('DocumentsController (Exhaustive HTTP Integration with Supertest)', () 
       expect(res.body).toHaveLength(1);
       expect(mockDocumentsService.findByRecipient).toHaveBeenCalledWith('emp-uuid-mock-1');
     });
+  });
+});
+
+describe('DocumentsController + Real DocumentsService + UserRoleGuard (Non-Mocked RBAC Integration)', () => {
+  let app: INestApplication;
+  let storedDoc: DocumentVerification;
+
+  const ownerUser = createMockUser({
+    id: 'owner-user-uuid-1',
+    email: 'owner@santisimo.edu',
+    fullName: 'Prof. Propietario',
+    roles: ['user'],
+  });
+
+  const intruderUser = createMockUser({
+    id: 'intruder-user-uuid-2',
+    email: 'intruder@santisimo.edu',
+    fullName: 'Prof. Intruso',
+    roles: ['user'],
+  });
+
+  const adminUser = createMockAdminUser({
+    id: 'admin-user-uuid-3',
+    email: 'admin@santisimo.edu',
+    fullName: 'Admin Real',
+    roles: ['admin'],
+  });
+
+  beforeEach(async () => {
+    storedDoc = createMockDocumentVerification({
+      id: 'b0000000-0000-4000-8000-000000000001',
+      recipientId: ownerUser.id,
+      status: DocumentStatus.VALID,
+    });
+
+    const mockDocRepo = {
+      findOne: jest.fn(({ where }) =>
+        Promise.resolve(where?.id === storedDoc.id ? storedDoc : null),
+      ),
+      find: jest.fn(() => Promise.resolve([])),
+      save: jest.fn((entity: DocumentVerification) => {
+        storedDoc = { ...storedDoc, ...entity };
+        return Promise.resolve(storedDoc);
+      }),
+    };
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      controllers: [DocumentsController],
+      providers: [
+        DocumentsService,
+        { provide: getRepositoryToken(DocumentVerification), useValue: mockDocRepo },
+        { provide: getRepositoryToken(require('../../auth/entities/auth.entity').User), useValue: {} },
+        { provide: CryptoService, useValue: {} },
+        { provide: QrGeneratorService, useValue: {} },
+        Reflector,
+      ],
+    })
+      .overrideGuard(AuthGuard('jwt'))
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          const req = context.switchToHttp().getRequest();
+          const authHeader = req.headers['authorization'];
+          if (!authHeader) throw new UnauthorizedException();
+          if (authHeader === 'Bearer owner-token') {
+            req.user = ownerUser;
+            return true;
+          }
+          if (authHeader === 'Bearer intruder-token') {
+            req.user = intruderUser;
+            return true;
+          }
+          if (authHeader === 'Bearer admin-token') {
+            req.user = adminUser;
+            return true;
+          }
+          throw new UnauthorizedException();
+        },
+      })
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    await app.init();
+  });
+
+  afterEach(async () => {
+    if (app) await app.close();
+  });
+
+  it('should reject 403 Forbidden when an intruder standard user tries to revoke another user document', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/documents/${storedDoc.id}/revoke`)
+      .set('Authorization', 'Bearer intruder-token')
+      .expect(403);
+
+    expect(res.body.message).toContain('No tienes permisos para anular documentos');
+    expect(storedDoc.status).toBe(DocumentStatus.VALID);
+  });
+
+  it('should allow owner user to revoke their own document (200 OK) and block them from restoring it (403 Forbidden)', async () => {
+    const revokeRes = await request(app.getHttpServer())
+      .patch(`/documents/${storedDoc.id}/revoke`)
+      .set('Authorization', 'Bearer owner-token')
+      .expect(200);
+
+    expect(revokeRes.body.status).toBe(DocumentStatus.REVOKED);
+    expect(storedDoc.status).toBe(DocumentStatus.REVOKED);
+
+    await request(app.getHttpServer())
+      .patch(`/documents/${storedDoc.id}/restore`)
+      .set('Authorization', 'Bearer owner-token')
+      .expect(403);
+
+    expect(storedDoc.status).toBe(DocumentStatus.REVOKED);
+  });
+
+  it('should allow admin user to revoke and restore any document (200 OK)', async () => {
+    await request(app.getHttpServer())
+      .patch(`/documents/${storedDoc.id}/revoke`)
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+    expect(storedDoc.status).toBe(DocumentStatus.REVOKED);
+
+    const restoreRes = await request(app.getHttpServer())
+      .patch(`/documents/${storedDoc.id}/restore`)
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+    expect(restoreRes.body.status).toBe(DocumentStatus.VALID);
+    expect(storedDoc.status).toBe(DocumentStatus.VALID);
   });
 });

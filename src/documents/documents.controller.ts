@@ -94,10 +94,10 @@ export class DocumentsController {
   }
 
   @Patch(':id/revoke')
-  @Auth(ValidRoles.admin)
+  @Auth()
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Anular/Revocar un documento emitido (Solo Administrador)',
+    summary: 'Anular/Revocar un documento emitido (Administrador o el propio empleado destinatario)',
     description: 'Marca el estado del comprobante con UUID :id como REVOKED en la base de datos.',
   })
   @ApiResponse({
@@ -105,8 +105,27 @@ export class DocumentsController {
     description: 'Documento revocado exitosamente.',
     type: DocumentVerification,
   })
-  revokeDocument(@Param('id', ParseUUIDPipe) id: string) {
-    return this.documentsService.revokeDocument(id);
+  revokeDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser() user: User,
+  ) {
+    return this.documentsService.revokeDocument(id, user);
+  }
+
+  @Patch(':id/restore')
+  @Auth(ValidRoles.admin)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Restaurar un documento previamente revocado (Solo Administrador)',
+    description: 'Devuelve el estado del comprobante con UUID :id a VALID en la base de datos si no colisiona con otro vigente.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Documento restaurado exitosamente.',
+    type: DocumentVerification,
+  })
+  restoreDocument(@Param('id', ParseUUIDPipe) id: string) {
+    return this.documentsService.restoreDocument(id);
   }
 
   @Get('recipient/:id')

@@ -322,6 +322,7 @@ export class EmpleadosController {
   async ConstanciaEmpleadoByID(
     @Res() response: Response,
     @Param('id') id: string,
+    @GetUser() issuer: User,
     @Query('month') month?: string,
     @Query('employerName') employerName?: string,
     @Query('employerPosition') employerPosition?: string,
@@ -334,6 +335,7 @@ export class EmpleadosController {
       employerPosition,
       employerCompany,
       documentId,
+      issuedByUser: issuer,
     });
 
     response.setHeader('Content-Type', 'application/pdf');

@@ -57,6 +57,8 @@ interface ActivityData {
 interface MonthlyReportProps {
   employerName: string;
   employerPosition: string;
+  secondarySignerName?: string;
+  secondarySignerPosition?: string;
   employeeName: User['fullName'];
   employeeCedula: NonNullable<User['cedula']>;
   employeePosition: Employee['position'];
@@ -111,6 +113,8 @@ export const constanciaMensualReport = (
     employerCompany,
     employerName,
     employerPosition,
+    secondarySignerName,
+    secondarySignerPosition,
     month,
     activities,
     qrDataUrl,
@@ -135,7 +139,7 @@ export const constanciaMensualReport = (
     },
     styles,
     pageMargins: [40, 45, 40, 45],
-    header: headerSection({ showLogo: true, ShowDate: true }),
+    header: headerSection({ showLogo: true, ShowDate: true, horizontalMargin: 40 }),
     content: [
       { text: 'CONSTANCIA DE TRABAJO MENSUAL', style: 'header' },
       {
@@ -143,17 +147,31 @@ export const constanciaMensualReport = (
         style: 'subheader',
       },
       {
-        text: [
-          `Yo, `,
-          { text: employerName, bold: true },
-          `, en mi calidad de ${employerPosition} de ${employerCompany}, por medio de la presente certifico que `,
-          { text: `${employeeName}`, bold: true },
-          `, portador de la cédula de identidad Nº ${employeeCedula}, ha laborado en nuestra institución desde el `,
-          { text: `${DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate))}` },
-          `, desempeñando el cargo de `,
-          { text: `${employeePosition}`, bold: true },
-          `, con una jornada de ${employeeHours} horas semanales, en horario de ${employeeWorkSchedule}.\n\n`,
-        ],
+        text: secondarySignerName && secondarySignerPosition
+          ? [
+              'Quienes suscriben, ',
+              { text: employerName, bold: true },
+              ` (${employerPosition}) y `,
+              { text: secondarySignerName, bold: true },
+              ` (${secondarySignerPosition}) de ${employerCompany}, por medio de la presente certifican que `,
+              { text: `${employeeName}`, bold: true },
+              `, portador de la cédula de identidad Nº ${employeeCedula}, ha laborado en nuestra institución desde el `,
+              { text: `${DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate))}` },
+              ', desempeñando el cargo de ',
+              { text: `${employeePosition}`, bold: true },
+              `, con una jornada de ${employeeHours} horas semanales, en horario de ${employeeWorkSchedule}.\n\n`,
+            ]
+          : [
+              'Yo, ',
+              { text: employerName, bold: true },
+              `, en mi calidad de ${employerPosition} de ${employerCompany}, por medio de la presente certifico que `,
+              { text: `${employeeName}`, bold: true },
+              `, portador de la cédula de identidad Nº ${employeeCedula}, ha laborado en nuestra institución desde el `,
+              { text: `${DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate))}` },
+              ', desempeñando el cargo de ',
+              { text: `${employeePosition}`, bold: true },
+              `, con una jornada de ${employeeHours} horas semanales, en horario de ${employeeWorkSchedule}.\n\n`,
+            ],
         style: 'body',
       },
       /* =========================================================================
@@ -190,50 +208,95 @@ export const constanciaMensualReport = (
       {
         text: 'Se expide la presente constancia a solicitud de la parte interesada para los fines que considere pertinentes.',
         style: 'body',
-        margin: [0, 5, 0, 15],
+        margin: [0, 5, 0, 10],
       },
       {
-        columns: [
-          {
-            width: '*',
+        text: 'Atentamente,',
+        style: 'signature',
+        margin: [0, 4, 0, 150],
+      },
+      secondarySignerName && secondarySignerPosition
+        ? {
+            columns: [
+              {
+                width: '45%',
+                stack: [
+                  {
+                    canvas: [
+                      { type: 'line', x1: 0, y1: 0, x2: 195, y2: 0, lineWidth: 0.8, lineColor: '#334155' },
+                    ],
+                    margin: [0, 0, 0, 5],
+                  },
+                  { text: employerName, style: 'signature', fontSize: 10 },
+                  { text: employerPosition, fontSize: 9, italics: true },
+                  { text: employerCompany, fontSize: 8 },
+                ],
+              },
+              { width: '10%', text: '' },
+              {
+                width: '45%',
+                stack: [
+                  {
+                    canvas: [
+                      { type: 'line', x1: 0, y1: 0, x2: 195, y2: 0, lineWidth: 0.8, lineColor: '#334155' },
+                    ],
+                    margin: [0, 0, 0, 5],
+                  },
+                  { text: secondarySignerName, style: 'signature', fontSize: 10 },
+                  { text: secondarySignerPosition, fontSize: 9, italics: true },
+                  { text: employerCompany, fontSize: 8 },
+                ],
+              },
+            ],
+            margin: [0, 0, 0, 20],
+          }
+        : {
             stack: [
-              { text: 'Atentamente,', style: 'signature', margin: [0, 0, 0, 10] },
+              {
+                canvas: [
+                  { type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 0.8, lineColor: '#334155' },
+                ],
+                margin: [0, 0, 0, 5],
+              },
               { text: employerName, style: 'signature' },
               { text: employerPosition, fontSize: 9, italics: true },
               { text: employerCompany, fontSize: 9 },
-              { text: DateFormatter.getDDMMMMYYYY(new Date()), fontSize: 8, color: '#64748b', margin: [0, 3, 0, 0] },
             ],
+            margin: [0, 0, 0, 20],
           },
-          qrDataUrl
-            ? {
-                width: 130,
+      qrDataUrl
+        ? {
+            alignment: 'center',
+            margin: [0, 6, 0, 0],
+            stack: [
+              {
+                image: qrDataUrl,
+                width: 138,
+                height: 138,
                 alignment: 'center',
-                stack: [
-                  {
-                    image: qrDataUrl,
-                    width: 70,
-                    height: 70,
-                    alignment: 'center',
-                  },
-                  {
-                    text: 'SELLO DIGITAL OFICIAL',
-                    fontSize: 7,
-                    bold: true,
-                    alignment: 'center',
-                    margin: [0, 3, 0, 1],
-                  },
-                  {
-                    text: verificationId ? `ID: ${verificationId.slice(0, 8)}...` : 'Verificación Criptográfica',
-                    fontSize: 6,
-                    alignment: 'center',
-                    color: '#64748b',
-                  },
-                ],
-              }
-            : { width: 0, text: '' },
-        ],
-        margin: [0, 40, 0, 0],
-      },
+              },
+              {
+                text: 'SELLO DIGITAL OFICIAL',
+                fontSize: 8,
+                bold: true,
+                alignment: 'center',
+                margin: [0, 5, 0, 2],
+              },
+              {
+                text: 'Escanear para verificar autenticidad',
+                fontSize: 7,
+                italics: true,
+                alignment: 'center',
+                color: '#475569',
+              },
+            ],
+          }
+        : {
+            text: `Emitido el ${DateFormatter.getDDMMMMYYYY(new Date())}`,
+            fontSize: 8,
+            color: '#64748b',
+            alignment: 'center',
+          },
     ],
     footer: {
       text: 'Este documento cuenta con un sello digital de autenticidad criptográfica verificable en el sistema de Santísimo Salvador.',

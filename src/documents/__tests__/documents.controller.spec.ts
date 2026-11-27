@@ -16,6 +16,7 @@ describe('DocumentsController', () => {
       verifyDocument: jest.fn(),
       findAll: jest.fn(),
       revokeDocument: jest.fn(),
+      restoreDocument: jest.fn(),
       findByRecipient: jest.fn(),
     };
 
@@ -80,17 +81,33 @@ describe('DocumentsController', () => {
   });
 
   describe('revokeDocument', () => {
-    it('should forward document UUID to documentsService.revokeDocument', async () => {
+    it('should forward document UUID and user to documentsService.revokeDocument', async () => {
+      const mockUser = createMockUser({ id: 'user-1' });
       const mockRevoked = createMockDocumentVerification({
         id: 'uuid-to-revoke',
         status: DocumentStatus.REVOKED,
       });
       (mockDocumentsService.revokeDocument as jest.Mock).mockResolvedValue(mockRevoked);
 
-      const result = await controller.revokeDocument('uuid-to-revoke');
+      const result = await controller.revokeDocument('uuid-to-revoke', mockUser);
 
-      expect(mockDocumentsService.revokeDocument).toHaveBeenCalledWith('uuid-to-revoke');
+      expect(mockDocumentsService.revokeDocument).toHaveBeenCalledWith('uuid-to-revoke', mockUser);
       expect(result).toBe(mockRevoked);
+    });
+  });
+
+  describe('restoreDocument', () => {
+    it('should forward document UUID to documentsService.restoreDocument', async () => {
+      const mockRestored = createMockDocumentVerification({
+        id: 'uuid-to-restore',
+        status: DocumentStatus.VALID,
+      });
+      (mockDocumentsService.restoreDocument as jest.Mock).mockResolvedValue(mockRestored);
+
+      const result = await controller.restoreDocument('uuid-to-restore');
+
+      expect(mockDocumentsService.restoreDocument).toHaveBeenCalledWith('uuid-to-restore');
+      expect(result).toBe(mockRestored);
     });
   });
 

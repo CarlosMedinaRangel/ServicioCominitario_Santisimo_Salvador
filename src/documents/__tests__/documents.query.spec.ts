@@ -1,12 +1,13 @@
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { DocumentsService } from '../documents.service';
 import {
   DocumentVerification,
   DocumentStatus,
+  DocumentType,
 } from '../entities/document-verification.entity';
 import { createMockDocumentVerification } from '../../../test/fixtures/document.fixture';
-import { MockType } from '../../../test/fixtures/user.fixture';
+import { createMockUser, createMockAdminUser, MockType } from '../../../test/fixtures/user.fixture';
 import { createDocumentsServiceTestModule } from '../../../test/fixtures/documents-service.factory';
 
 describe('DocumentsService - Queries, Revocation & Pagination', () => {
@@ -56,6 +57,121 @@ describe('DocumentsService - Queries, Revocation & Pagination', () => {
         expect.objectContaining({
           id: MOCK_DOC_ID,
           status: DocumentStatus.REVOKED,
+        }),
+      );
+    });
+
+    it('should throw ForbiddenException when a standard user tries to revoke another recipient document', async () => {
+      const otherDoc = createMockDocumentVerification({
+        id: MOCK_DOC_ID,
+        recipientId: 'another-user-uuid',
+        status: DocumentStatus.VALID,
+      });
+      (mockDocRepo.findOne as jest.Mock).mockResolvedValue(otherDoc);
+
+      const standardUser = createMockUser({
+        id: 'requester-user-uuid',
+        roles: ['user'],
+      });
+
+      await expect(service.revokeDocument(MOCK_DOC_ID, standardUser)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(mockDocRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should allow a standard user to revoke their own document', async () => {
+      const ownDoc = createMockDocumentVerification({
+        id: MOCK_DOC_ID,
+        recipientId: 'owner-user-uuid',
+        status: DocumentStatus.VALID,
+      });
+      (mockDocRepo.findOne as jest.Mock).mockResolvedValue(ownDoc);
+
+      const ownerUser = createMockUser({
+        id: 'owner-user-uuid',
+        roles: ['user'],
+      });
+
+      const result = await service.revokeDocument(MOCK_DOC_ID, ownerUser);
+
+      expect(result.status).toBe(DocumentStatus.REVOKED);
+      expect(mockDocRepo.save).toHaveBeenCalled();
+    });
+
+    it('should allow an admin user to revoke any recipient document', async () => {
+      const targetDoc = createMockDocumentVerification({
+        id: MOCK_DOC_ID,
+        recipientId: 'employee-uuid',
+        status: DocumentStatus.VALID,
+      });
+      (mockDocRepo.findOne as jest.Mock).mockResolvedValue(targetDoc);
+
+      const adminUser = createMockAdminUser({
+        id: 'admin-uuid',
+        roles: ['admin'],
+      });
+
+      const result = await service.revokeDocument(MOCK_DOC_ID, adminUser);
+
+      expect(result.status).toBe(DocumentStatus.REVOKED);
+      expect(mockDocRepo.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('restoreDocument', () => {
+    it('should throw NotFoundException if document does not exist', async () => {
+      (mockDocRepo.findOne as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.restoreDocument('missing-uuid')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw BadRequestException if another VALID document exists for the same period', async () => {
+      const revokedDoc = createMockDocumentVerification({
+        id: MOCK_DOC_ID,
+        recipientId: 'emp-1',
+        documentType: DocumentType.CONSTANCIA_TRABAJO,
+        status: DocumentStatus.REVOKED,
+        metadata: { mes: '2026-11' },
+      });
+      const newerValidDoc = createMockDocumentVerification({
+        id: 'newer-valid-doc-uuid',
+        recipientId: 'emp-1',
+        documentType: DocumentType.CONSTANCIA_TRABAJO,
+        status: DocumentStatus.VALID,
+        metadata: { mes: '2026-11' },
+      });
+
+      (mockDocRepo.findOne as jest.Mock).mockResolvedValue(revokedDoc);
+      (mockDocRepo.find as jest.Mock).mockResolvedValue([newerValidDoc]);
+
+      await expect(service.restoreDocument(MOCK_DOC_ID)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockDocRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should restore a REVOKED document to VALID when no active duplicate exists', async () => {
+      const revokedDoc = createMockDocumentVerification({
+        id: MOCK_DOC_ID,
+        recipientId: 'emp-1',
+        documentType: DocumentType.CONSTANCIA_TRABAJO,
+        status: DocumentStatus.REVOKED,
+        metadata: { mes: '2026-11' },
+      });
+
+      (mockDocRepo.findOne as jest.Mock).mockResolvedValue(revokedDoc);
+      (mockDocRepo.find as jest.Mock).mockResolvedValue([]);
+
+      const result = await service.restoreDocument(MOCK_DOC_ID);
+
+      expect(result.status).toBe(DocumentStatus.VALID);
+      expect(mockDocRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: MOCK_DOC_ID,
+          status: DocumentStatus.VALID,
         }),
       );
     });

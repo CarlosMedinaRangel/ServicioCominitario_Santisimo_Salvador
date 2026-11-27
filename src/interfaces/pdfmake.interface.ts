@@ -156,6 +156,25 @@ export interface ContentSVG extends Style {
   fit?: [number, number];
 }
 
+export interface ContentCanvasElement {
+  type: 'line' | 'rect' | 'ellipse' | 'polyline';
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  lineWidth?: number;
+  lineColor?: string;
+  color?: string;
+}
+
+export interface ContentCanvas extends Style {
+  canvas: ContentCanvasElement[];
+}
+
 // Tipo recursivo que agrupa todo el contenido posible
 export type Content =
   | string
@@ -166,6 +185,7 @@ export type Content =
   | ContentTable
   | ContentList
   | ContentSVG
+  | ContentCanvas
   | Content[];
 
 export interface DocumentMetadata {
