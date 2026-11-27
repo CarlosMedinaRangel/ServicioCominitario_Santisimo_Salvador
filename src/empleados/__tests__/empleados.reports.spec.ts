@@ -24,6 +24,7 @@ describe('EmpleadosService - Constancias & Cryptographic QR PDF (Test 11 & 12)',
   beforeEach(async () => {
     mockEmployeeRepo = {
       findOne: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
     };
 
     mockPrinterService = {
@@ -44,10 +45,16 @@ describe('EmpleadosService - Constancias & Cryptographic QR PDF (Test 11 & 12)',
         verificationCode: 'SS-DOC:v1:mock.token',
         qrDataUrl: 'data:image/png;base64,mockQr',
       }),
+      findValidByRecipientAndPeriod: jest.fn().mockResolvedValue(null),
+      getQrDataUrl: jest.fn().mockResolvedValue('data:image/png;base64,mockQr'),
     };
 
     mockCryptoService = {
       encryptPayload: jest.fn().mockReturnValue('SS-EDID:v1:mock'),
+      decryptPayload: jest.fn().mockReturnValue({
+        uuid: 'doc-uuid-123',
+        issuedAt: new Date().toISOString(),
+      }),
     };
 
     mockActivityService = {
@@ -108,5 +115,123 @@ describe('EmpleadosService - Constancias & Cryptographic QR PDF (Test 11 & 12)',
 
     expect(pdf).toBeDefined();
     expect(Buffer.isBuffer(pdf)).toBe(true);
+  });
+
+  it('should reuse existing valid document when one already exists for the recipient and period', async () => {
+    const mockEmployee = createMockEmployee({
+      userId: MOCK_UUID,
+      position: 'Docente Titular',
+      hours_per_day: 8,
+      work_schedule: 'Lunes a Viernes 7:00am - 1:00pm',
+      start_date: new Date('2020-01-15'),
+      user: createMockUser({
+        id: MOCK_UUID,
+        cedula: 'V-18765432',
+        fullName: 'Mario Silva',
+      }),
+    });
+
+    (mockEmployeeRepo.findOne as jest.Mock).mockResolvedValue(mockEmployee);
+    (mockDocumentsService.findValidByRecipientAndPeriod as jest.Mock).mockResolvedValue(
+      createMockDocumentVerification({
+        id: 'existing-doc-uuid',
+        documentType: DocumentType.CONSTANCIA_TRABAJO,
+        recipientId: MOCK_UUID,
+        recipientIdentifier: 'V-18765432',
+        recipientName: 'Mario Silva',
+        status: DocumentStatus.VALID,
+        verificationCode: 'SS-DOC:v1:existing.code',
+      }),
+    );
+
+    const pdf = await service.ConstanciaEmpleadoByID(MOCK_UUID, {
+      month: '2026-10',
+    });
+
+    // Should NOT issue a new document
+    expect(mockDocumentsService.issueDocument).not.toHaveBeenCalled();
+    // Should reuse existing QR
+    expect(mockDocumentsService.getQrDataUrl).toHaveBeenCalledWith('SS-DOC:v1:existing.code');
+    expect(mockPrinterService.createPdf).toHaveBeenCalled();
+    expect(pdf).toBeDefined();
+  });
+
+  it('should automatically resolve Directora and Rector Administrativo when no manual signer is provided', async () => {
+    const mockEmployee = createMockEmployee({
+      userId: MOCK_UUID,
+      position: 'Docente Titular',
+      user: createMockUser({
+        id: MOCK_UUID,
+        cedula: 'V-18765432',
+        fullName: 'Mario Silva',
+      }),
+    });
+
+    const directora = createMockEmployee({
+      userId: 'a0000000-0000-4000-8000-000000000006',
+      position: 'Directora',
+      user: createMockUser({
+        id: 'a0000000-0000-4000-8000-000000000006',
+        fullName: 'Prof. Sussy Margarita Morales',
+      }),
+    });
+
+    const rector = createMockEmployee({
+      userId: 'a0000000-0000-4000-8000-000000000007',
+      position: 'Rector Administrativo',
+      user: createMockUser({
+        id: 'a0000000-0000-4000-8000-000000000007',
+        fullName: 'Lcdo. Ronald Medina',
+      }),
+    });
+
+    (mockEmployeeRepo.findOne as jest.Mock).mockResolvedValue(mockEmployee);
+    (mockEmployeeRepo.find as jest.Mock).mockResolvedValue([directora, rector]);
+
+    await service.ConstanciaEmpleadoByID(MOCK_UUID);
+
+    expect(mockDocumentsService.issueDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issuedByName: 'Prof. Sussy Margarita Morales (Directora) / Lcdo. Ronald Medina (Rector Administrativo)',
+      }),
+    );
+  });
+
+  it('should record the authenticated issuer as issuedByUserId/issuedByName while keeping institutional signatories', async () => {
+    const mockEmployee = createMockEmployee({
+      userId: MOCK_UUID,
+      position: 'Docente Titular',
+      user: createMockUser({
+        id: MOCK_UUID,
+        cedula: 'V-18765432',
+        fullName: 'Mario Silva',
+      }),
+    });
+
+    const issuerUser = createMockUser({
+      id: 'admin-emitter-uuid',
+      fullName: 'Administrador del Sistema',
+      roles: ['admin'],
+    });
+
+    (mockEmployeeRepo.findOne as jest.Mock).mockResolvedValue(mockEmployee);
+    (mockEmployeeRepo.find as jest.Mock).mockResolvedValue([]);
+
+    await service.ConstanciaEmpleadoByID(MOCK_UUID, {
+      issuedByUser: issuerUser,
+    });
+
+    expect(mockDocumentsService.issueDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issuedByUserId: 'admin-emitter-uuid',
+        issuedByName: 'Administrador del Sistema',
+        metadata: expect.objectContaining({
+          firmantes: [
+            'Prof. Sussy Margarita Morales (Directora)',
+            'Lcdo. Ronald Medina (Rector Administrativo)',
+          ],
+        }),
+      }),
+    );
   });
 });

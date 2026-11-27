@@ -26,6 +26,7 @@ export interface ConstanciaOptions {
   employerPosition?: string;
   employerCompany?: string;
   documentId?: string;
+  issuedByUser?: User;
 }
 
 @Injectable()
@@ -78,16 +79,59 @@ export class ConstanciaService {
     return employee;
   }
 
+  private async resolveInstitutionalSignatories(): Promise<{
+    director: { name: string; position: string };
+    rector: { name: string; position: string };
+  }> {
+    const fallback = {
+      director: { name: 'Prof. Sussy Margarita Morales', position: 'Directora' },
+      rector: { name: 'Lcdo. Ronald Medina', position: 'Rector Administrativo' },
+    };
+
+    if (typeof this.employeeRepository.find !== 'function') {
+      return fallback;
+    }
+
+    const candidates =
+      (await this.employeeRepository.find({
+        where: { user: { isActive: true } },
+        relations: { user: true },
+      })) || [];
+
+    const directorEmp = candidates.find(
+      (e) => /^director/i.test(e.position?.trim() || '') && e.user?.fullName,
+    );
+    const rectorEmp = candidates.find(
+      (e) => /rector.*administrativ/i.test(e.position?.trim() || '') && e.user?.fullName,
+    );
+
+    return {
+      director: directorEmp
+        ? { name: directorEmp.user!.fullName, position: directorEmp.position }
+        : fallback.director,
+      rector: rectorEmp
+        ? { name: rectorEmp.user!.fullName, position: rectorEmp.position }
+        : fallback.rector,
+    };
+  }
+
   async ConstanciaEmpleadoByID(
     id: string,
     options?: ConstanciaOptions,
   ) {
     const employee = await this.findEmployee(id);
     const user = employee.user!;
+    const { director, rector } = await this.resolveInstitutionalSignatories();
 
-    const employerName = options?.employerName || 'Carlos Medina';
-    const employerPosition = options?.employerPosition || 'Director';
-    const employerCompany = options?.employerCompany || 'Santisimo Salvador';
+    const hasManualOverride = Boolean(options?.employerName);
+    const employerName = options?.employerName || director.name;
+    const employerPosition = options?.employerPosition || director.position;
+    const secondarySignerName = hasManualOverride ? undefined : rector.name;
+    const secondarySignerPosition = hasManualOverride ? undefined : rector.position;
+    const employerCompany = options?.employerCompany || 'U.E. Colegio Santísimo Salvador';
+    const issuedBySummary = hasManualOverride
+      ? `${employerName} (${employerPosition})`
+      : `${employerName} (${employerPosition}) / ${rector.name} (${rector.position})`;
 
     let docRecordId: string;
     let qrDataUrl: string;
@@ -120,26 +164,56 @@ export class ConstanciaService {
       );
       docRecordId = existing.id;
     } else {
-      // Emisión de documento nuevo (ej. desde modal de administración)
-      const issued = await this.documentsService.issueDocument({
-        documentType: DocumentType.CONSTANCIA_TRABAJO,
-        recipientType: RecipientType.EMPLOYEE,
-        recipientId: employee.userId,
-        recipientIdentifier: user.cedula || 'N/A',
-        recipientName: user.fullName,
-        issuedByName: `${employerName} (${employerPosition})`,
-        metadata: {
-          empresa: employerCompany,
-          cargo: employee.position,
-          horas: employee.hours_per_day,
-          horario: employee.work_schedule,
-          fechaInicio: employee.start_date,
-          mes: options?.month || null,
-        },
-      });
-      docRecordId = issued.record.id;
-      qrDataUrl = issued.qrDataUrl;
-      effectiveIssueDate = issued.record.issuedAt;
+      // 1. Verificar si ya existe un documento VÁLIDO emitido para este empleado y período
+      const existing =
+        await this.documentsService.findValidByRecipientAndPeriod(
+          employee.userId,
+          DocumentType.CONSTANCIA_TRABAJO,
+          options?.month,
+        );
+
+      if (existing) {
+        // Reutilizar documento criptográfico existente para garantizar idempotencia y no duplicar registros
+        const payload = this.cryptoService.decryptPayload(
+          existing.verificationCode,
+          'DOC',
+        );
+        effectiveIssueDate = payload.issuedAt || existing.issuedAt;
+        qrDataUrl = await this.documentsService.getQrDataUrl(
+          existing.verificationCode,
+        );
+        docRecordId = existing.id;
+      } else {
+        // Emisión de documento nuevo cuando no existe constancia previa para el período
+        const firmantes = secondarySignerName && secondarySignerPosition
+          ? [
+              `${employerName} (${employerPosition})`,
+              `${secondarySignerName} (${secondarySignerPosition})`,
+            ]
+          : [`${employerName} (${employerPosition})`];
+
+        const issued = await this.documentsService.issueDocument({
+          documentType: DocumentType.CONSTANCIA_TRABAJO,
+          recipientType: RecipientType.EMPLOYEE,
+          recipientId: employee.userId,
+          recipientIdentifier: user.cedula || 'N/A',
+          recipientName: user.fullName,
+          issuedByUserId: options?.issuedByUser?.id,
+          issuedByName: options?.issuedByUser?.fullName || issuedBySummary,
+          metadata: {
+            empresa: employerCompany,
+            cargo: employee.position,
+            horas: employee.hours_per_day,
+            horario: employee.work_schedule,
+            fechaInicio: employee.start_date,
+            mes: options?.month || null,
+            firmantes,
+          },
+        });
+        docRecordId = issued.record.id;
+        qrDataUrl = issued.qrDataUrl;
+        effectiveIssueDate = issued.record.issuedAt;
+      }
     }
 
     if (options?.month) {
@@ -150,17 +224,20 @@ export class ConstanciaService {
       const startDate = new Date(year, mes - 1, 1);
       const endDate = new Date(year, mes, 0, 23, 59, 59);
 
-      const activities = await this.activityRepository.find({
-        where: {
-          employeeId: employee.userId,
-          timestamp: Between(startDate, endDate),
-        },
-        order: { timestamp: 'DESC' },
-      });
+      const activities =
+        (await this.activityRepository.find({
+          where: {
+            employeeId: employee.userId,
+            timestamp: Between(startDate, endDate),
+          },
+          order: { timestamp: 'DESC' },
+        })) || [];
 
       const docDefinition = constanciaMensualReport({
         employerName,
         employerPosition,
+        secondarySignerName,
+        secondarySignerPosition,
         employerCompany,
         employeeName: user.fullName,
         employeeCedula: user.cedula || 'N/A',
@@ -183,7 +260,7 @@ export class ConstanciaService {
       void this.activityService.log(employee.userId, {
         tipo: 'Constancia Generada',
         descripcion: `Constancia mensual de ${monthStr}-${yearStr}`,
-        detalle: `Firmada por ${employerName} (${employerPosition})`,
+        detalle: `Firmada por ${issuedBySummary}`,
         destacada: true,
       });
 
@@ -193,6 +270,8 @@ export class ConstanciaService {
     const docDefinition = employementLetterReportByID({
       employerName,
       employerPosition,
+      secondarySignerName,
+      secondarySignerPosition,
       employerCompany,
       employeeName: user.fullName,
       employeeCedula: user.cedula || 'N/A',
@@ -209,7 +288,7 @@ export class ConstanciaService {
     void this.activityService.log(employee.userId, {
       tipo: 'Constancia Generada',
       descripcion: 'Constancia de trabajo',
-      detalle: `Firmada por ${employerName} (${employerPosition})`,
+      detalle: `Firmada por ${issuedBySummary}`,
       destacada: true,
     });
 
