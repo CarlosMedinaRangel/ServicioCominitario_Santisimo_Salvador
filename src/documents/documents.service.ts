@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike, Between } from 'typeorm';
@@ -16,6 +17,7 @@ import { QrGeneratorService } from '../crypto/qr-generator.service';
 import { randomUUID } from 'node:crypto';
 
 import { User } from '../auth/entities/auth.entity';
+import { ValidRoles } from '../auth/interfaces';
 
 export interface IssueDocumentParams {
   documentType: DocumentVerification['documentType'];
@@ -257,6 +259,40 @@ export class DocumentsService {
   }
 
   /**
+   * Finds an existing active/valid document for a recipient and optional period (e.g. mes or anoEscolar).
+   * Used to guarantee idempotency and avoid creating duplicate QR seals or database records.
+   */
+  async findValidByRecipientAndPeriod(
+    recipientId: string,
+    documentType: DocumentType,
+    period?: string | null,
+  ): Promise<DocumentVerification | null> {
+    const records = await this.docVerificationRepo.find({
+      where: {
+        recipientId,
+        documentType,
+        status: DocumentStatus.VALID,
+      },
+      order: { issuedAt: 'DESC' },
+    });
+
+    if (records.length === 0) return null;
+
+    if (!period) {
+      return records[0];
+    }
+
+    const match = records.find(
+      (r) =>
+        r.metadata?.mes === period ||
+        r.metadata?.anoEscolar === period ||
+        r.metadata?.period === period,
+    );
+
+    return match || null;
+  }
+
+  /**
    * Re-generates QR Data URL for an existing verification code.
    */
   async getQrDataUrl(verificationCode: string): Promise<string> {
@@ -265,14 +301,60 @@ export class DocumentsService {
 
   /**
    * Revokes an existing issued document.
+   * Admin can revoke any document; regular users can only revoke their own documents.
    */
-  async revokeDocument(id: string): Promise<DocumentVerification> {
+  async revokeDocument(id: string, user?: User): Promise<DocumentVerification> {
     const record = await this.docVerificationRepo.findOne({ where: { id } });
     if (!record) {
       throw new NotFoundException(`Documento con ID ${id} no encontrado.`);
     }
 
+    if (user) {
+      const isAdmin = user.roles?.includes(ValidRoles.admin);
+      if (!isAdmin && record.recipientId !== user.id) {
+        throw new ForbiddenException(
+          'No tienes permisos para anular documentos de otro destinatario.',
+        );
+      }
+    }
+
     record.status = DocumentStatus.REVOKED;
+    return this.docVerificationRepo.save(record);
+  }
+
+  /**
+   * Restores a previously revoked document back to VALID status.
+   * Only administrators can restore documents.
+   */
+  async restoreDocument(id: string): Promise<DocumentVerification> {
+    const record = await this.docVerificationRepo.findOne({ where: { id } });
+    if (!record) {
+      throw new NotFoundException(`Documento con ID ${id} no encontrado.`);
+    }
+
+    if (record.status === DocumentStatus.VALID) {
+      return record;
+    }
+
+    const period =
+      record.metadata?.mes ||
+      record.metadata?.anoEscolar ||
+      record.metadata?.period;
+
+    if (record.recipientId) {
+      const activeValid = await this.findValidByRecipientAndPeriod(
+        record.recipientId,
+        record.documentType,
+        period,
+      );
+      if (activeValid && activeValid.id !== record.id) {
+        throw new BadRequestException(
+          'Ya existe un documento vigente para este destinatario en el mismo período. Anúlelo antes de restaurar este.',
+        );
+      }
+    }
+
+    record.status = DocumentStatus.VALID;
     return this.docVerificationRepo.save(record);
   }
 
