@@ -104,10 +104,46 @@ export const CANONICAL_INACTIVE_USER = {
   employee: undefined,
 } satisfies EntityData<User>;
 
+export const CANONICAL_SUSSY_USER = {
+  id: 'a0000000-0000-4000-8000-000000000006',
+  email: 'sussy.margarita@santisimo.edu',
+  password: '$2b$10$mockHashedPasswordSussy1234567890abc',
+  fullName: 'Prof. Sussy Margarita Morales',
+  cedula: 'V10234567',
+  telefono: '04147654321',
+  roles: ['admin', 'user'],
+  isActive: true,
+  imagen: null,
+  publicId: null,
+  failedLoginAttempts: 0,
+  lockedUntil: null,
+  lastFailedAttemptAt: null,
+  employee: undefined,
+} satisfies EntityData<User>;
+
+export const CANONICAL_RONALD_USER = {
+  id: 'a0000000-0000-4000-8000-000000000007',
+  email: 'ronald.medina@santisimo.edu',
+  password: '$2b$10$mockHashedPasswordRonald123456789abc',
+  fullName: 'Lcdo. Ronald Medina',
+  cedula: 'V12345679',
+  telefono: '04247654321',
+  roles: ['admin', 'user'],
+  isActive: true,
+  imagen: null,
+  publicId: null,
+  failedLoginAttempts: 0,
+  lockedUntil: null,
+  lastFailedAttemptAt: null,
+  employee: undefined,
+} satisfies EntityData<User>;
+
 export const CANONICAL_USERS = {
   admin: CANONICAL_ADMIN_USER,
   elena: CANONICAL_ELENA_USER,
   carlos: CANONICAL_CARLOS_USER,
   ana: CANONICAL_ANA_USER,
   inactive: CANONICAL_INACTIVE_USER,
+  sussy: CANONICAL_SUSSY_USER,
+  ronald: CANONICAL_RONALD_USER,
 };

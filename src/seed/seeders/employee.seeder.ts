@@ -8,6 +8,8 @@ import {
   CANONICAL_CARLOS_EMPLOYEE,
   CANONICAL_ANA_EMPLOYEE,
   CANONICAL_INACTIVE_EMPLOYEE,
+  CANONICAL_SUSSY_EMPLOYEE,
+  CANONICAL_RONALD_EMPLOYEE,
 } from '../data/employees.canonical';
 
 export interface SeededEmployees {
@@ -15,6 +17,8 @@ export interface SeededEmployees {
   carlos: Employee;
   ana: Employee;
   inactive: Employee;
+  sussy: Employee;
+  ronald: Employee;
   bulk: Employee[];
 }
 
@@ -54,7 +58,21 @@ export class EmployeeSeeder {
     });
     await this.employeeRepository.save(inactive);
 
-    // 5. Bulk Employees (15 empleados de volumen para pruebas de carga y paginación)
+    // 5. Prof. Sussy Margarita Morales (Directora Canónica)
+    const sussy = this.employeeRepository.create({
+      ...CANONICAL_SUSSY_EMPLOYEE,
+      userId: users.sussy.id,
+    });
+    await this.employeeRepository.save(sussy);
+
+    // 6. Lcdo. Ronald Medina (Rector Administrativo Canónico)
+    const ronald = this.employeeRepository.create({
+      ...CANONICAL_RONALD_EMPLOYEE,
+      userId: users.ronald.id,
+    });
+    await this.employeeRepository.save(ronald);
+
+    // 7. Bulk Employees (15 empleados de volumen para pruebas de carga y paginación)
     const timeSlots = [
       { time: '07:00:00', hours: 8, label: '7am - 3pm' },
       { time: '08:00:00', hours: 8, label: '8am - 4pm' },
@@ -88,6 +106,6 @@ export class EmployeeSeeder {
       bulk.push(bulkEmp);
     }
 
-    return { elena, carlos, ana, inactive, bulk };
+    return { elena, carlos, ana, inactive, sussy, ronald, bulk };
   }
 }
