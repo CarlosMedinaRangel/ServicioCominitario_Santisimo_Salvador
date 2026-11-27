@@ -31,6 +31,8 @@ const styles: StyleDictionary = {
 interface ReportProps {
   employerName: string;
   employerPosition: string;
+  secondarySignerName?: string;
+  secondarySignerPosition?: string;
   employeeName: User['fullName'];
   employeeCedula: NonNullable<User['cedula']>;
   employeePosition: Employee['position'];
@@ -56,6 +58,8 @@ export const employementLetterReportByID = (
     employerCompany,
     employerName,
     employerPosition,
+    secondarySignerName,
+    secondarySignerPosition,
     issueDate,
     qrDataUrl,
     verificationId,
@@ -89,19 +93,35 @@ export const employementLetterReportByID = (
         style: 'header',
       },
       {
-        text: [
-          `Yo, `,
-          { text: employerName, bold: true },
-          `, en mi calidad de ${employerPosition} de ${employerCompany}, por medio de la presente certifico que `,
-          { text: employeeName, bold: true },
-          `, titular de la cédula de identidad Nº `,
-          { text: employeeCedula, bold: true },
-          `, labora en nuestra institución desde el `,
-          { text: DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate)), bold: true },
-          `, desempeñando el cargo de `,
-          { text: employeePosition, bold: true },
-          `.`,
-        ],
+        text: secondarySignerName && secondarySignerPosition
+          ? [
+              'Quienes suscriben, ',
+              { text: employerName, bold: true },
+              ` (${employerPosition}) y `,
+              { text: secondarySignerName, bold: true },
+              ` (${secondarySignerPosition}) de ${employerCompany}, por medio de la presente certifican que `,
+              { text: employeeName, bold: true },
+              ', titular de la cédula de identidad Nº ',
+              { text: employeeCedula, bold: true },
+              ', labora en nuestra institución desde el ',
+              { text: DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate)), bold: true },
+              ', desempeñando el cargo de ',
+              { text: employeePosition, bold: true },
+              '.',
+            ]
+          : [
+              'Yo, ',
+              { text: employerName, bold: true },
+              `, en mi calidad de ${employerPosition} de ${employerCompany}, por medio de la presente certifico que `,
+              { text: employeeName, bold: true },
+              ', titular de la cédula de identidad Nº ',
+              { text: employeeCedula, bold: true },
+              ', labora en nuestra institución desde el ',
+              { text: DateFormatter.getDDMMMMYYYY(new Date(employeeStartDate)), bold: true },
+              ', desempeñando el cargo de ',
+              { text: employeePosition, bold: true },
+              '.',
+            ],
         style: 'body',
         margin: [0, 0, 0, 20],
       },
@@ -113,58 +133,96 @@ export const employementLetterReportByID = (
       {
         text: `Esta constancia se expide a solicitud de la parte interesada para los fines que considere convenientes.`,
         style: 'body',
-        margin: [0, 0, 0, 50],
+        margin: [0, 0, 0, 10],
       },
       {
-        columns: [
-          {
-            width: '*',
+        text: 'Atentamente,',
+        style: 'signature',
+        margin: [0, 4, 0, 145],
+      },
+      secondarySignerName && secondarySignerPosition
+        ? {
+            columns: [
+              {
+                width: '45%',
+                stack: [
+                  {
+                    canvas: [
+                      { type: 'line', x1: 0, y1: 0, x2: 195, y2: 0, lineWidth: 0.8, lineColor: '#334155' },
+                    ],
+                    margin: [0, 0, 0, 5],
+                  },
+                  { text: employerName, style: 'signature', fontSize: 10 },
+                  { text: employerPosition, fontSize: 9, italics: true, color: '#334155' },
+                  { text: employerCompany, fontSize: 8, color: '#475569' },
+                ],
+              },
+              { width: '10%', text: '' },
+              {
+                width: '45%',
+                stack: [
+                  {
+                    canvas: [
+                      { type: 'line', x1: 0, y1: 0, x2: 195, y2: 0, lineWidth: 0.8, lineColor: '#334155' },
+                    ],
+                    margin: [0, 0, 0, 5],
+                  },
+                  { text: secondarySignerName, style: 'signature', fontSize: 10 },
+                  { text: secondarySignerPosition, fontSize: 9, italics: true, color: '#334155' },
+                  { text: employerCompany, fontSize: 8, color: '#475569' },
+                ],
+              },
+            ],
+            margin: [0, 0, 0, 18],
+          }
+        : {
             stack: [
-              { text: 'Atentamente,', style: 'signature', margin: [0, 0, 0, 25] },
+              {
+                canvas: [
+                  { type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 0.8, lineColor: '#334155' },
+                ],
+                margin: [0, 0, 0, 5],
+              },
               { text: employerName, style: 'signature' },
               { text: employerPosition, fontSize: 10, italics: true, color: '#334155' },
               { text: employerCompany, fontSize: 10, color: '#334155' },
-              { text: formattedIssueDate, fontSize: 9, color: '#64748b', margin: [0, 6, 0, 0] },
             ],
+            margin: [0, 0, 0, 18],
           },
-          qrDataUrl
-            ? {
-                width: 140,
+      qrDataUrl
+        ? {
+            alignment: 'center',
+            margin: [0, 6, 0, 0],
+            stack: [
+              {
+                image: qrDataUrl,
+                width: 138,
+                height: 138,
                 alignment: 'center',
-                stack: [
-                  {
-                    image: qrDataUrl,
-                    width: 80,
-                    height: 80,
-                    alignment: 'center',
-                  },
-                  {
-                    text: 'SELLO DIGITAL OFICIAL',
-                    fontSize: 7,
-                    bold: true,
-                    alignment: 'center',
-                    margin: [0, 4, 0, 1],
-                    color: '#1e293b',
-                  },
-                  {
-                    text: verificationId ? `ID: ${verificationId.slice(0, 8)}...` : 'Verificación Criptográfica',
-                    fontSize: 6,
-                    alignment: 'center',
-                    color: '#64748b',
-                  },
-                  {
-                    text: 'Escanear para verificar autenticidad',
-                    fontSize: 6,
-                    italics: true,
-                    alignment: 'center',
-                    color: '#475569',
-                  },
-                ],
-              }
-            : { width: 0, text: '' },
-        ],
-        margin: [0, 20, 0, 0],
-      },
+              },
+              {
+                text: 'SELLO DIGITAL OFICIAL',
+                fontSize: 8,
+                bold: true,
+                alignment: 'center',
+                margin: [0, 5, 0, 2],
+                color: '#1e293b',
+              },
+              {
+                text: 'Escanear para verificar autenticidad',
+                fontSize: 7,
+                italics: true,
+                alignment: 'center',
+                color: '#475569',
+              },
+            ],
+          }
+        : {
+            text: `Emitido el ${formattedIssueDate}`,
+            fontSize: 9,
+            color: '#64748b',
+            alignment: 'center',
+          },
     ],
   };
 

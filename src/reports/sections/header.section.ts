@@ -9,6 +9,7 @@ interface HeaderOptions {
   ShowDate?: boolean;
   date?: Date | string;
   city?: string;
+  horizontalMargin?: number;
 }
 
 const logo: Content = {
@@ -20,7 +21,13 @@ const logo: Content = {
 };
 
 export const headerSection = (options: HeaderOptions): Content => {
-  const { ShowDate = true, showLogo = true, subtitle, title, date, city } = options;
+  const {
+    ShowDate = true,
+    showLogo = true,
+    date,
+    city,
+    horizontalMargin = 50,
+  } = options;
 
   const targetDate = date ? new Date(date) : new Date();
   const dateString = DateFormatter.getDDMMMMYYYY(targetDate);
@@ -37,5 +44,6 @@ export const headerSection = (options: HeaderOptions): Content => {
     : '';
   return {
     columns: [headerLogo, headerDate],
+    margin: [horizontalMargin, 15, horizontalMargin, 0],
   };
 };
