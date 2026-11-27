@@ -5,6 +5,8 @@ import {
   CANONICAL_CARLOS_USER,
   CANONICAL_ANA_USER,
   CANONICAL_INACTIVE_USER,
+  CANONICAL_SUSSY_USER,
+  CANONICAL_RONALD_USER,
 } from './users.canonical';
 
 /**
@@ -75,9 +77,37 @@ export const CANONICAL_INACTIVE_EMPLOYEE = {
   activities: [],
 } satisfies EntityData<Employee>;
 
+export const CANONICAL_SUSSY_EMPLOYEE = {
+  userId: CANONICAL_SUSSY_USER.id,
+  position: 'Directora',
+  start_date: new Date('2015-09-01T00:00:00.000Z'),
+  work_time: '08:00:00',
+  hours_per_day: 8,
+  work_schedule: 'Lunes a Viernes, 8am - 4pm',
+  user: CANONICAL_SUSSY_USER,
+  schedules: [],
+  groups: [],
+  activities: [],
+} satisfies EntityData<Employee>;
+
+export const CANONICAL_RONALD_EMPLOYEE = {
+  userId: CANONICAL_RONALD_USER.id,
+  position: 'Rector Administrativo',
+  start_date: new Date('2017-09-01T00:00:00.000Z'),
+  work_time: '08:00:00',
+  hours_per_day: 8,
+  work_schedule: 'Lunes a Viernes, 8am - 4pm',
+  user: CANONICAL_RONALD_USER,
+  schedules: [],
+  groups: [],
+  activities: [],
+} satisfies EntityData<Employee>;
+
 export const CANONICAL_EMPLOYEES = {
   elena: CANONICAL_ELENA_EMPLOYEE,
   carlos: CANONICAL_CARLOS_EMPLOYEE,
   ana: CANONICAL_ANA_EMPLOYEE,
   inactive: CANONICAL_INACTIVE_EMPLOYEE,
+  sussy: CANONICAL_SUSSY_EMPLOYEE,
+  ronald: CANONICAL_RONALD_EMPLOYEE,
 } as const;

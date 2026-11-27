@@ -57,8 +57,8 @@ export class SeedService {
 
     return {
       message: 'Database seeded successfully',
-      usersCount: 1 + 4 + users.bulk.length,
-      employeesCount: 4 + employees.bulk.length,
+      usersCount: 1 + 6 + users.bulk.length,
+      employeesCount: 6 + employees.bulk.length,
       schedulesCount: schedules.schedulesCount,
       groupsCount: schedules.groupsCount,
       activitiesCount: activities.activitiesCount,

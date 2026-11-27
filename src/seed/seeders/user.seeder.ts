@@ -10,6 +10,8 @@ import {
   CANONICAL_CARLOS_USER,
   CANONICAL_ANA_USER,
   CANONICAL_INACTIVE_USER,
+  CANONICAL_SUSSY_USER,
+  CANONICAL_RONALD_USER,
 } from '../data/users.canonical';
 
 export interface SeededUsers {
@@ -18,6 +20,8 @@ export interface SeededUsers {
   carlos: User;
   ana: User;
   inactive: User;
+  sussy: User;
+  ronald: User;
   bulk: User[];
 }
 
@@ -96,7 +100,25 @@ export class UserSeeder {
     });
     await this.userRepository.save(inactive);
 
-    // 6. Bulk Employees (Employee 1..15)
+    // 6. Prof. Sussy Margarita Morales (Directora Canónica)
+    const sussyPassword =
+      this.configService.get<string>('SEED_SUSSY_PASSWORD') || 'Sussy123!';
+    const sussy = this.userRepository.create({
+      ...CANONICAL_SUSSY_USER,
+      password: await bcrypt.hash(sussyPassword, 10),
+    });
+    await this.userRepository.save(sussy);
+
+    // 7. Lcdo. Ronald Medina (Rector Administrativo Canónico)
+    const ronaldPassword =
+      this.configService.get<string>('SEED_RONALD_PASSWORD') || 'Ronald123!';
+    const ronald = this.userRepository.create({
+      ...CANONICAL_RONALD_USER,
+      password: await bcrypt.hash(ronaldPassword, 10),
+    });
+    await this.userRepository.save(ronald);
+
+    // 8. Bulk Employees (Employee 1..15)
     const bulk: User[] = [];
     for (let i = 1; i <= 15; i++) {
       const bulkUser = this.userRepository.create({
@@ -112,6 +134,6 @@ export class UserSeeder {
       bulk.push(bulkUser);
     }
 
-    return { admin, elena, carlos, ana, inactive, bulk };
+    return { admin, elena, carlos, ana, inactive, sussy, ronald, bulk };
   }
 }
