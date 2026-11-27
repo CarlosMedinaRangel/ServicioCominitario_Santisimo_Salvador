@@ -32,7 +32,7 @@
 | D-11 | No unit tests (0 spec files) | `resolved` | 27 test suites, 180 unit & Supertest integration tests (100% passing) |
 | D-12 | No migrations despite config | `prototype-ok` | Deferred until schema final |
 | D-13 | Misleading docs (explanation.md) | `fix-now` | Update or archive |
-| D-17 | Hardcoded employer signatory defaults (`Carlos Medina`, `Director`) | `remove-on-real-data` | Move default signatories to config/environment variables (`EMPLOYER_NAME`, `EMPLOYER_POSITION`, `EMPLOYER_COMPANY`) once formal school representatives are designated |
+| D-17 | Firmas institucionales fijas (Directora/Director y Rector/Rectora Administrativo) | `resolved` | Todas las constancias resuelven automáticamente desde la BD a los empleados activos con cargo Director/Directora (`Prof. Sussy Margarita Morales`) y Rector/Rectora Administrativo (`Lcdo. Ronald Medina`) e imprimen doble firma en el PDF; `issuedByUserId` / `issuedByName` registra al usuario/admin real que emitió el comprobante para control y auditoría. |
 | D-20 | No Dockerfile | `fix-now` | Create for Render deploy |
 | D-26 | `as any` casts in start_date | `resolved` | Removed redundant casts in seed.service.ts |
 | D-27 | bcrypt.hashSync in request path | `resolved` | Migrated to async await bcrypt.hash() across all services and seeders |
@@ -42,6 +42,7 @@
 | D-36 | Trayectoria Laboral Escolar / Historial de Cargos Institucionales (Job/Academic Position History) | `remove-on-real-data` | Found: 2026-11-04. Actualmente la entidad `Employee` es 1:1 con `User` y refleja solo el estado vivo más reciente; al actualizar cargos o datos por CSV/edición se sobreescribe la fila. Se requiere diseñar una tabla histórica (ej. `employee_positions` con `fecha_inicio`, `fecha_fin`, `cargo`, `ano_escolar`) para auditar la carrera docente y ascensos en el tiempo. **Condición:** Abordar una vez se reciban las plantillas y formatos oficiales del Colegio Santísimo Salvador para apegarse a su estructura real. |
 | D-37 | Auto-Mapping de Columnas adaptado a Plantilla XLS/CSV Oficial del Colegio | `remove-on-real-data` | Found: 2026-11-04. El auto-mapeo en `AdminColumnMappingModal.tsx` se limita estrictamente a los títulos exactos vigentes del prototipo (ignorando mayúsculas/minúsculas). **Condición:** Cuando la institución suministre la plantilla oficial de Excel/nómina con sus encabezados reales, actualizar la lista de coincidencia de cabeceras para que coincida de forma 100% nativa con las columnas institucionales. |
 | D-41 | DeprecationWarning `pg@9.0`: `client.query()` concurrente en `activity-service` | `resolved` | Refactorizado `logMany` para inserción en lote (`save(activities)`) con una sola consulta `findOneBy`, eliminando concurrencia sobre socket de `pg`. |
+| D-42 | Formato de Período Escolar Oficial ("Año Escolar") en Constancias y Períodos | `remove-on-real-data` | Found: 2026-11-21. En constancias de trabajo y períodos académicos del Colegio Santísimo Salvador, el período se denomina "año escolar" con formato canónico "mes año - mes año" (ej: "Septiembre 2025 - Julio 2026"). Los comprobantes de nómina/pago se mantienen mensuales ("Octubre 2026"). Requiere sincronizar seeders, DTOs y schemas frontend. |
 
 ---
 
@@ -125,7 +126,10 @@
 - [ ] Fix D-28: Add atomic transaction (`dataSource.transaction` / `QueryRunner`) and bulk optimization to Excel `uploadFile`
 - [ ] Fix D-29: Create custom repository classes extending `Repository<T>` for domain queries (aligned with D-07 decomposition)
 - [x] Fix D-09: Extract `ConstanciaService` (isolate pdfmake reports and cryptographic QR seal issuance from employee CRUD)
-- [ ] Implement `AcademicPeriod` entity (Year/Lapso) to historically bind `schedules` and `groups` (Advanced from Phase 6 to establish clean relational foundations before real XLS data arrival)
+- [ ] Implement `AcademicPeriod` entity (Year/Lapso) to historically bind `schedules`, `groups`, and `documents` (Advanced from Phase 6 to establish clean relational foundations before real XLS data arrival):
+  - [ ] Backend: Define `AcademicPeriod` entity (`id`, `label` e.g. `"Septiembre 2025 - Julio 2026"`, `startDate`, `endDate`, `isActive`) and seed canonical school years (D-42)
+  - [ ] Backend: Refactor `ConstanciaService` / `DocumentsService` period matching to distinguish `"año escolar"` (`mes año - mes año` for constancias de trabajo) vs monthly (`YYYY-MM` / `"Octubre 2026"` for payroll receipts)
+  - [ ] Frontend: Derive Month-Picker and School-Year Range Picker (`mes año - mes año`) variants from the custom `DatePicker` component while preserving day-level `DatePicker` for future use
 
 ### Phase 3: Real Data Integration
 
